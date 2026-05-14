@@ -122,6 +122,22 @@
   .phase-tile .tile-links a:hover { background: var(--bg); border-color: var(--accent); }
   .phase-tile .tile-links a.alt { color: var(--accent-2); }
   .phase-tile .tile-links a.muted { color: var(--muted); }
+  /* Jupyter-style notebook blocks inside cards */
+  .notebook { margin: 16px 0 12px; background: rgba(11, 13, 18, 0.6); border: 1px solid var(--border);
+    border-radius: 8px; padding: 12px 14px; }
+  .notebook .nb-title { color: var(--accent-2); text-transform: none; letter-spacing: 0;
+    font-size: 0.82rem; margin: 0 0 10px; font-weight: 600; display: flex; align-items: center; gap: 8px; }
+  .notebook .nb-title::before { content: "▶"; font-size: 0.75rem; color: var(--accent-2); }
+  .notebook .nb-sub { color: var(--muted); font-size: 0.78rem; margin: -6px 0 10px; }
+  .notebook .cell { display: grid; grid-template-columns: 38px 1fr; gap: 8px; margin-bottom: 8px; align-items: start; }
+  .notebook .cn { color: var(--muted); font-family: ui-monospace, SFMono-Regular, monospace; font-size: 0.72rem;
+    background: var(--panel-2); padding: 4px 6px; border-radius: 4px; text-align: center;
+    border: 1px solid var(--border); white-space: nowrap; }
+  .notebook .cn.bash { color: var(--accent-2); }
+  .notebook .cn.py { color: var(--accent); }
+  .notebook .cn.md { color: var(--warn); }
+  .notebook pre { margin: 0; background: var(--code-bg); border: 1px solid var(--border);
+    padding: 8px 10px; font-size: 0.83em; line-height: 1.5; }
 </style>
 </head>
 <body>
@@ -530,6 +546,21 @@ y = x ** 3
 y.backward()
 print(x.grad)  # 3 * x^2 = 12.0</code></pre>
         <p class="muted">Mental model from your background: think of autograd like a <em>distributed tracing span tree</em> — every op is a span, <code>.backward()</code> walks it in reverse to propagate gradients.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab</div>
+          <div class="nb-sub">Paste each cell into a fresh notebook.</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code># Autograd = reverse-mode autodiff. Build a graph, walk it back.
+import torch
+
+x = torch.tensor([2.0], requires_grad=True)
+y = x ** 3
+y.backward()
+
+print("autograd:   ", x.grad.item())          # 12.0
+print("analytical: ", 3 * (2.0 ** 2))         # 12.0  (d/dx x^3 = 3x^2)
+assert torch.isclose(x.grad, torch.tensor([12.0]))</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: what happens if you call <code>.backward()</code> twice without <code>retain_graph=True</code>?</summary>
           <div class="answer">The graph is freed after the first backward pass to save memory, so the second call raises a RuntimeError. Use <code>retain_graph=True</code> on the first call only if you genuinely need multiple backward passes.</div>
@@ -547,6 +578,30 @@ print(x.grad)  # 3 * x^2 = 12.0</code></pre>
           <li><strong>Universal approximation</strong>: an MLP with enough hidden units can approximate any continuous function on a compact set. (In practice "enough" is huge — depth helps efficiency.)</li>
           <li><strong>Initialization matters</strong>: bad init → vanishing/exploding signals or grads. Standard schemes: Kaiming for ReLU-likes, Xavier/Glorot for tanh, scaled-init for transformers.</li>
         </ul>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import torch.nn as nn
+
+# A two-layer MLP. The nonlinearity is what makes depth useful.
+mlp = nn.Sequential(
+    nn.Linear(784, 128),
+    nn.ReLU(),
+    nn.Linear(128, 10),
+)
+x = torch.randn(32, 784)
+print("input:  ", x.shape)
+print("output: ", mlp(x).shape)               # [32, 10]
+print("params: ", sum(p.numel() for p in mlp.parameters()))
+
+# Sanity: composing two Linears (no nonlinearity) is just one Linear.
+a = nn.Linear(8, 8, bias=False); b = nn.Linear(8, 8, bias=False)
+W = b.weight @ a.weight                       # collapsed equivalent
+y_seq    = b(a(x[:1, :8]))
+y_single = x[:1, :8] @ W.T
+print("collapsed equal:", torch.allclose(y_seq, y_single, atol=1e-6))</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: if you replace ReLU with the identity in a 10-layer MLP, what do you get?</summary>
           <div class="answer">A single linear layer (mathematically equivalent). Depth without nonlinearity is wasted parameters.</div>
@@ -561,6 +616,27 @@ print(x.grad)  # 3 * x^2 = 12.0</code></pre>
         <p>Models don't see strings. They see integers (token IDs) that index into an <strong>embedding table</strong>: a learned matrix of shape <code>(vocab_size, d_model)</code>. <code>embedding[token_id]</code> returns a vector that becomes the model's first internal representation of that token.</p>
         <p>Tokenizers: BPE (GPT-2/3), SentencePiece (T5, LLaMA), tiktoken (GPT-4). They learn frequent subword merges so common words are one token and rare words decompose into pieces. For images, the analog is patches → a linear projection acts like an embedding table for pixels; for video, patches across space <em>and</em> time.</p>
         <p>This generalizes: for video diffusion (Phase 4) you'll have spatial patches × temporal positions, but the idea is identical — a discrete index becomes a dense vector that the model can compute on.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import torch.nn as nn
+
+vocab = ["&lt;pad&gt;", "the", "cat", "sat", "on", "mat"]
+stoi = {s: i for i, s in enumerate(vocab)}
+embed = nn.Embedding(num_embeddings=len(vocab), embedding_dim=16)
+
+ids = torch.tensor([stoi["the"], stoi["cat"], stoi["sat"]])
+e = embed(ids)
+print("token ids:  ", ids)
+print("embed shape:", e.shape)                # [3, 16]
+print("embed table:", embed.weight.shape)     # [vocab=6, d=16]
+
+# Equivalent: one-hot @ embedding_table (but dense + index is much faster)
+one_hot = torch.zeros(len(ids), len(vocab))
+one_hot[torch.arange(len(ids)), ids] = 1.0
+print("one-hot equiv:", torch.allclose(one_hot @ embed.weight, e))</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: why don't language models use one-hot vectors directly instead of an embedding table?</summary>
           <div class="answer">One-hots are sparse 50,000-dim vectors — wasteful and unhelpful. The embedding table is exactly the matrix you'd left-multiply a one-hot by; we skip the math and do an index lookup. The dense d_model-dim output also lets similar tokens cluster geometrically (king - man + woman ≈ queen).</div>
@@ -584,6 +660,32 @@ out     = weights @ V               # (n, d_v)</code></pre>
         <p><strong>Why divide by √d_k?</strong> If Q and K entries are unit-variance, Q·K has variance d_k. Softmax of large numbers saturates → gradients vanish. Dividing keeps softmax in a useful regime. This is the single most-asked self-attention interview question.</p>
         <p><strong>Causal mask</strong> for autoregressive models: set scores above the diagonal to <code>-inf</code> before softmax so a token can't attend to its own future. (Bidirectional models like BERT skip this.)</p>
         <p><strong>Multi-head</strong>: run <em>h</em> attention operations in parallel with smaller d_k = d_model/h, concatenate. Different heads learn different relations (syntax, coreference, semantics) — see Anthropic's circuits work for examples.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+B, T, d = 1, 6, 16
+x = torch.randn(B, T, d)
+
+Wq = nn.Linear(d, d, bias=False)
+Wk = nn.Linear(d, d, bias=False)
+Wv = nn.Linear(d, d, bias=False)
+
+Q, K, V = Wq(x), Wk(x), Wv(x)
+scores = Q @ K.transpose(-2, -1) / (d ** 0.5)            # the sqrt(d) divisor
+mask = torch.triu(torch.ones(T, T), diagonal=1).bool()
+scores = scores.masked_fill(mask, float("-inf"))         # causal mask
+attn = F.softmax(scores, dim=-1)
+out = attn @ V
+
+print("attn shape:", attn.shape)
+print("row sums (should all be 1):", attn.sum(dim=-1)[0])
+print("upper triangle is 0 (causal):", attn[0].masked_select(mask).abs().sum().item())
+print("out shape: ", out.shape)</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: if you have 8 heads and d_model = 512, what's d_k per head, and how many learned parameters in <code>W_Q</code> total?</summary>
           <div class="answer">d_k = 64 per head. W_Q total is (512, 512) = 262,144 params (since concatenating 8 heads × 64 d_k = 512). Same for W_K, W_V, W_O. So self-attention has ~4 × d_model² params.</div>
@@ -605,6 +707,33 @@ def block(x):
         <p><strong>LayerNorm</strong>: normalizes each token's feature vector to mean 0, variance 1, then applies a learned scale and shift. Keeps the residual stream from drifting.</p>
         <p><strong>MLP</strong>: usually <code>Linear(d, 4d) → GELU → Linear(4d, d)</code>. The 4× expansion is empirical — gives the model "scratch space" to process per-token.</p>
         <p>That's it. A 175B-param GPT-3 is this block stacked 96 times with d_model=12288 and h=96 heads. The architecture is shallow in concepts and deep in compute.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import torch.nn as nn
+
+class TransformerBlock(nn.Module):
+    """Pre-norm transformer block: norm -&gt; sublayer -&gt; residual."""
+    def __init__(self, d, heads, mlp_ratio=4):
+        super().__init__()
+        self.ln1 = nn.LayerNorm(d)
+        self.attn = nn.MultiheadAttention(d, heads, batch_first=True)
+        self.ln2 = nn.LayerNorm(d)
+        self.mlp = nn.Sequential(
+            nn.Linear(d, d * mlp_ratio), nn.GELU(),
+            nn.Linear(d * mlp_ratio, d),
+        )
+    def forward(self, x):
+        h = self.ln1(x)
+        x = x + self.attn(h, h, h, need_weights=False)[0]
+        x = x + self.mlp(self.ln2(x))
+        return x
+
+blk = TransformerBlock(d=64, heads=4)
+print("output:", blk(torch.randn(2, 16, 64)).shape)
+print("params:", sum(p.numel() for p in blk.parameters()))</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: what would happen if you removed the residual connections from a 12-layer transformer?</summary>
           <div class="answer">Training would either diverge or stall — gradients can't reach the early layers. This is the same problem ResNet solved for vision in 2015. The residual is structural, not optional.</div>
@@ -626,6 +755,34 @@ def block(x):
           <li><strong>ALiBi</strong>: bias attention scores by token distance, no learned position info at all.</li>
         </ul>
         <p>For Phase 4 (video diffusion) you'll also see <strong>3D positional encodings</strong> for (height, width, time) — same idea, three axes.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch, math
+
+def sinusoidal_posenc(seq_len, d):
+    pos = torch.arange(seq_len).unsqueeze(1).float()
+    div = torch.exp(torch.arange(0, d, 2).float() * (-math.log(10000.0) / d))
+    pe = torch.zeros(seq_len, d)
+    pe[:, 0::2] = torch.sin(pos * div)
+    pe[:, 1::2] = torch.cos(pos * div)
+    return pe
+
+pe = sinusoidal_posenc(seq_len=10, d=8)
+print("posenc shape:", pe.shape)
+print("pos 0 (first 3 dims):", pe[0, :3])
+print("pos 1 (first 3 dims):", pe[1, :3])     # different — that's the point
+
+# Demo: without posenc, shuffling tokens gives identical attention outputs
+import torch.nn as nn
+attn = nn.MultiheadAttention(8, 1, batch_first=True)
+seq = torch.randn(1, 4, 8)
+out_orig = attn(seq, seq, seq, need_weights=False)[0]
+perm = seq[:, [3, 0, 2, 1], :]
+out_perm = attn(perm, perm, perm, need_weights=False)[0]
+print("attention is permutation-equivariant:",
+      torch.allclose(out_orig[:, [3,0,2,1], :], out_perm, atol=1e-5))</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: a friend says, "Modern LLMs don't need positional encoding because they use RoPE." Correct them.</summary>
           <div class="answer">RoPE <em>is</em> positional encoding — just applied multiplicatively inside attention (rotating Q, K) instead of additively to the input embeddings. The model still very much encodes position; it does so in a way that makes relative position natural and extrapolates further than learned absolute positions.</div>
@@ -648,6 +805,33 @@ def block(x):
           <li><strong>Gradient clipping</strong>: <code>nn.utils.clip_grad_norm_(params, 1.0)</code>. Stops one anomalous batch from blowing up your loss.</li>
           <li><strong>Learning rate warmup + cosine decay</strong>: linearly ramp LR from 0 to peak over the first ~2% of training, then cosine-decay to ~10% of peak. This is the default schedule for nearly every LLM and diffusion model.</li>
         </ul>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import torch.nn as nn
+
+# 1) Weight tying — input embedding and output projection share weights
+class TinyLM(nn.Module):
+    def __init__(self, vocab, d):
+        super().__init__()
+        self.embed = nn.Embedding(vocab, d)
+        self.head = nn.Linear(d, vocab, bias=False)
+        self.head.weight = self.embed.weight        # the tie
+m = TinyLM(vocab=100, d=32)
+print("tied:", m.embed.weight is m.head.weight)     # True
+
+# 2) Grad clipping — call before optimizer.step()
+params = [torch.randn(10, requires_grad=True) for _ in range(3)]
+for p in params: p.sum().backward()
+total = torch.nn.utils.clip_grad_norm_(params, max_norm=1.0)
+print("pre-clip grad norm:", float(total))
+
+# 3) bf16 autocast — fp32 weights, bf16 compute
+with torch.autocast(device_type="cpu", dtype=torch.bfloat16):
+    out = nn.Linear(8, 8)(torch.randn(2, 8))
+    print("dtype inside autocast:", out.dtype)</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: you train a model and loss is healthy for the first 1000 steps, then suddenly spikes to NaN and stays there. Three things to check first.</summary>
           <div class="answer">(1) Gradient clipping — turn it on at 1.0. (2) Learning rate too high after warmup — try halving it. (3) Mixed-precision overflow — check if you're using fp16 (try bf16 instead; bf16 has the same dynamic range as fp32). Also check input data for outliers — a single bad batch can trigger NaN propagation.</div>
@@ -683,6 +867,33 @@ def block(x):
           <li>Using <code>nn.CrossEntropyLoss</code> AND applying softmax in the model — CrossEntropyLoss expects raw logits.</li>
           <li>Not calling <code>model.eval()</code> + <code>torch.no_grad()</code> at eval time → dropout/BN still active, gradient memory wasted.</li>
         </ul>
+        <div class="notebook">
+          <div class="nb-title">Colab starter — paste into a new notebook to begin</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch torchvision wandb</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.utils.data import DataLoader
+from torchvision import datasets, transforms
+import wandb
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+# wandb.login()
+# wandb.init(project="phase-1-a1", config={"lr": 1e-3, "batch": 128, "epochs": 5})
+
+tfm = transforms.ToTensor()
+train = datasets.MNIST("./data", train=True,  download=True, transform=tfm)
+test  = datasets.MNIST("./data", train=False, download=True, transform=tfm)
+train_loader = DataLoader(train, batch_size=128, shuffle=True)
+test_loader  = DataLoader(test,  batch_size=256)
+
+model = nn.Sequential(nn.Flatten(), nn.Linear(784, 128), nn.ReLU(), nn.Linear(128, 10)).to(device)
+opt = torch.optim.Adam(model.parameters(), lr=1e-3)
+print("ready. params:", sum(p.numel() for p in model.parameters()))</code></pre></div>
+          <div class="cell"><span class="cn py">[2]</span><pre><code># TODO: training loop for 5 epochs, target test acc ≥ 97%.
+# TODO: implement my_softmax(x, dim) from scratch; verify against F.softmax.
+# TODO: verify autograd on f(x)=sin(x^2). Compare to analytical 2x*cos(x^2).</code></pre></div>
+        </div>
         <ul class="checklist">
           <li><input type="checkbox" id="a1-done"><label for="a1-done">Assignment 1 deliverable pushed to GitHub.</label></li>
         </ul>
@@ -710,6 +921,43 @@ def block(x):
         <p>Folder <code>phase-1/a2-bigram/</code> with notebook, README explaining what a bigram is, train/val loss plot, and the 500-char sample. Compare your sample to what a uniform-random model would produce.</p>
         <h4>Stretch (optional)</h4>
         <p>Compute the cross-entropy of a uniform model (it's just <code>ln(vocab_size)</code>) and compare to your model's final loss. The gap is the information your bigram learned.</p>
+        <div class="notebook">
+          <div class="nb-title">Colab starter</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch
+!wget -q https://raw.githubusercontent.com/karpathy/char-rnn/master/data/tinyshakespeare/input.txt</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+text = open("input.txt").read()
+chars = sorted(set(text))
+vocab_size = len(chars)
+stoi = {c: i for i, c in enumerate(chars)}
+itos = {i: c for i, c in enumerate(chars)}
+
+data = torch.tensor([stoi[c] for c in text], dtype=torch.long)
+n = int(0.9 * len(data))
+train_data, val_data = data[:n], data[n:]
+
+def get_batch(split, block_size=8, batch_size=32):
+    d = train_data if split == "train" else val_data
+    ix = torch.randint(0, len(d) - block_size - 1, (batch_size,))
+    x = torch.stack([d[i:i + block_size]      for i in ix])
+    y = torch.stack([d[i + 1:i + block_size + 1] for i in ix])
+    return x, y
+
+class Bigram(nn.Module):
+    def __init__(self, vocab):
+        super().__init__()
+        self.embed = nn.Embedding(vocab, vocab)
+    def forward(self, idx):
+        return self.embed(idx)                           # (B, T, vocab)
+
+print("vocab:", vocab_size, "  data len:", len(data))</code></pre></div>
+          <div class="cell"><span class="cn py">[2]</span><pre><code># TODO: train 5000 steps with AdamW, lr=1e-3, batch=32, block=8.
+# TODO: target val loss ≤ 2.5.
+# TODO: implement generate(idx, max_new_tokens) using torch.multinomial.</code></pre></div>
+        </div>
         <ul class="checklist">
           <li><input type="checkbox" id="a2-done"><label for="a2-done">Assignment 2 deliverable pushed to GitHub.</label></li>
         </ul>
@@ -747,6 +995,38 @@ def block(x):
           <li>Forgetting that <code>softmax(-inf) = 0</code> only works if the row isn't all <code>-inf</code> — never happens with causal mask, but happens with padding masks if you mask the whole row.</li>
           <li>Dividing by <code>d_model</code> instead of <code>d_head</code>.</li>
         </ul>
+        <div class="notebook">
+          <div class="nb-title">Colab starter</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class SingleHeadAttention(nn.Module):
+    def __init__(self, d_model, d_head):
+        super().__init__()
+        self.d_head = d_head
+        self.Wq = nn.Linear(d_model, d_head, bias=False)
+        self.Wk = nn.Linear(d_model, d_head, bias=False)
+        self.Wv = nn.Linear(d_model, d_head, bias=False)
+
+    def forward(self, x):
+        B, T, _ = x.shape
+        Q, K, V = self.Wq(x), self.Wk(x), self.Wv(x)
+        # TODO:
+        # 1) scores = Q @ K.transpose(-2,-1) / sqrt(d_head)
+        # 2) mask upper triangle with -inf (causal)
+        # 3) attn = softmax(scores, dim=-1)
+        # 4) return attn @ V
+        raise NotImplementedError
+
+# Sanity test (after you implement): identical tokens -&gt; identical outputs without mask.
+attn = SingleHeadAttention(d_model=32, d_head=32)
+x = torch.randn(1, 1, 32).repeat(1, 8, 1)
+# print(attn(x))</code></pre></div>
+          <div class="cell"><span class="cn py">[2]</span><pre><code># TODO: replace A2's bigram with: embed -&gt; single-head attn -&gt; linear-to-logits.
+# TODO: retrain; compare val loss against bigram.</code></pre></div>
+        </div>
         <ul class="checklist">
           <li><input type="checkbox" id="a3-done"><label for="a3-done">Assignment 3 deliverable pushed to GitHub.</label></li>
         </ul>
@@ -774,6 +1054,37 @@ def block(x):
         <p>Folder <code>phase-1/a4-transformer/</code> with the full implementation, train/val loss curve, and a README with three sample generations and a paragraph on what surprised you about training (e.g., when loss flattens, what helps, what fails).</p>
         <h4>Stretch</h4>
         <p>Add gradient clipping at 1.0. Add LR warmup over the first 100 steps. Add <code>wandb.watch(model)</code> to track param/grad norms. Submit the W&amp;B project link in your README.</p>
+        <div class="notebook">
+          <div class="nb-title">Colab starter</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch wandb</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class MultiHeadAttention(nn.Module):
+    def __init__(self, d_model, num_heads):
+        super().__init__()
+        assert d_model % num_heads == 0
+        self.num_heads = num_heads
+        self.d_head = d_model // num_heads
+        self.qkv  = nn.Linear(d_model, 3 * d_model, bias=False)
+        self.proj = nn.Linear(d_model, d_model)
+    def forward(self, x):
+        B, T, C = x.shape
+        # TODO: split into (B, n_heads, T, d_head), batched matmul, causal mask, softmax
+        raise NotImplementedError
+
+class TransformerBlock(nn.Module):
+    def __init__(self, d_model, num_heads, mlp_ratio=4):
+        super().__init__()
+        # TODO: pre-norm form -- LayerNorm -&gt; MHA -&gt; residual, then LN -&gt; MLP -&gt; residual
+        pass
+    def forward(self, x):
+        raise NotImplementedError</code></pre></div>
+          <div class="cell"><span class="cn py">[2]</span><pre><code># TODO: stack 4 TransformerBlocks. Add learned posenc.
+# Config: d_model=128, heads=4, block_size=64, batch=64, lr=3e-4, 5000 steps.
+# Target val loss ≤ 1.6 on TinyShakespeare.</code></pre></div>
+        </div>
         <ul class="checklist">
           <li><input type="checkbox" id="a4-done"><label for="a4-done">Assignment 4 deliverable pushed to GitHub.</label></li>
         </ul>
@@ -816,6 +1127,45 @@ def block(x):
           <li>Sketch a transformer block on paper from memory.</li>
         </ul>
         <p>Have me (in Code Reviewer mode) grill you on those four. Only then move to Phase 2 (diffusion fundamentals).</p>
+        <div class="notebook">
+          <div class="nb-title">Colab starter</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch tiktoken wandb</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import torch.nn as nn
+from dataclasses import dataclass
+import tiktoken
+
+@dataclass
+class Config:
+    block_size:   int   = 128
+    n_layer:      int   = 6
+    n_head:       int   = 8
+    n_embd:       int   = 256
+    dropout:      float = 0.1
+    lr_max:       float = 3e-4
+    warmup_steps: int   = 100
+    total_steps:  int   = 30_000
+
+enc = tiktoken.get_encoding("gpt2")
+print("vocab:", enc.n_vocab)
+
+# Real training adds: AdamW + cosine LR + warmup, gradient clipping,
+# torch.autocast(dtype=torch.bfloat16), gradient accumulation,
+# checkpoint save/resume, W&amp;B logging, sampling cb every N steps.</code></pre></div>
+          <div class="cell"><span class="cn py">[2]</span><pre><code># Skeleton training step
+# model = GPT(Config()).cuda()
+# opt   = torch.optim.AdamW(model.parameters(), lr=Config.lr_max, betas=(0.9, 0.95))
+# scaler = torch.cuda.amp.GradScaler()
+# for step in range(Config.total_steps):
+#     x, y = get_batch("train")
+#     with torch.autocast(device_type="cuda", dtype=torch.bfloat16):
+#         loss = model(x, y)
+#     opt.zero_grad(set_to_none=True)
+#     scaler.scale(loss).backward()
+#     scaler.unscale_(opt)
+#     torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+#     scaler.step(opt); scaler.update()</code></pre></div>
+        </div>
         <ul class="checklist">
           <li><input type="checkbox" id="a5-done"><label for="a5-done">Assignment 5 (capstone) deliverable pushed and shared publicly.</label></li>
           <li><input type="checkbox" id="phase1-final"><label for="phase1-final">Phase 1 final checkpoint passed (re-explained all four concepts cold).</label></li>
@@ -843,6 +1193,24 @@ def block(x):
 <pre><code>x_t = √ᾱ_t · x₀ + √(1 - ᾱ_t) · ε,    ε ~ N(0, I)</code></pre>
         <p>This is the closed form of <code>q(x_t | x₀)</code>. It's why training is fast: for each example, sample a random <code>t</code>, sample <code>ε</code>, get <code>x_t</code> in one line. No loop over <code>t</code>.</p>
         <p class="muted">Mental model from your background: think of the forward process as a <em>deterministic encoder</em> from data to noise — except it's a stochastic, fixed (non-learned) one. The model only ever learns the <em>reverse</em>.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+
+T = 1000
+beta = torch.linspace(1e-4, 0.02, T)             # linear schedule
+alpha = 1.0 - beta
+alpha_bar = torch.cumprod(alpha, dim=0)
+
+# Closed form: x_t = sqrt(alpha_bar_t) * x_0 + sqrt(1 - alpha_bar_t) * eps
+x0 = torch.randn(1, 1, 28, 28)                   # placeholder "image"
+for t in [0, 100, 500, 999]:
+    eps = torch.randn_like(x0)
+    xt  = alpha_bar[t].sqrt() * x0 + (1 - alpha_bar[t]).sqrt() * eps
+    print(f"t={t:4d}  mean={xt.mean():+.3f}  std={xt.std():.3f}")
+# By t=999 the marginal should look like N(0, 1).</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: as <code>t → T</code>, what happens to <code>ᾱ_t</code>, and what does that mean for <code>x_T</code>?</summary>
           <div class="answer"><code>ᾱ_t → 0</code> (it's a product of values &lt; 1). So <code>x_t → √0·x₀ + √1·ε = ε</code> — pure standard Gaussian noise. The schedule is engineered so this happens by <code>t = T</code>; if it doesn't, the model has to learn to denoise from data that still has signal, which breaks the assumption that we can start sampling from <code>N(0, I)</code>.</div>
@@ -864,6 +1232,29 @@ def block(x):
           <li><strong>v-prediction</strong> (Salimans &amp; Ho, used by SD2 and many video models): predict <code>v = √ᾱ_t · ε - √(1-ᾱ_t) · x₀</code>. Better behaved across the whole noise range — this is what most modern image/video models use.</li>
         </ul>
         <p>Pick one parametrization and stick with it; the loss is the same up to a per-timestep weighting.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+# The three prediction targets are algebraically equivalent.
+T = 1000
+beta = torch.linspace(1e-4, 0.02, T); alpha = 1 - beta
+alpha_bar = torch.cumprod(alpha, dim=0)
+
+x0  = torch.randn(8, 3, 32, 32)
+eps = torch.randn_like(x0)
+t   = 500
+ab  = alpha_bar[t]
+xt  = ab.sqrt() * x0 + (1 - ab).sqrt() * eps
+
+# Given xt and eps, recover x0:
+x0_hat = (xt - (1 - ab).sqrt() * eps) / ab.sqrt()
+print("x0 recovered exactly:", torch.allclose(x0_hat, x0, atol=1e-5))
+
+# v-prediction target: v = sqrt(alpha_bar)*eps - sqrt(1-alpha_bar)*x0
+v = ab.sqrt() * eps - (1 - ab).sqrt() * x0
+print("v shape:", v.shape, "  v.mean:", v.mean().item())</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: why is x₀-prediction unstable at very high <code>t</code> (close to <code>T</code>)?</summary>
           <div class="answer">At <code>t ≈ T</code>, the input is essentially pure noise — there's almost no information about <code>x₀</code> in <code>x_t</code>. The network's job is too hard: predict the entire image from noise. ε-prediction is easier because the noise <em>is</em> what's there. v-prediction interpolates between the two and works across the whole range, which is why it's the modern default.</div>
@@ -886,6 +1277,40 @@ t   = sample from Uniform{1, ..., T}
 x_t = √ᾱ_t · x₀ + √(1-ᾱ_t) · ε   # forward process
 loss = MSE( ε_θ(x_t, t), ε )      # predict the noise</code></pre>
         <p>Surprisingly simple given the page of derivation behind it. <strong>You should be able to write the training loop in 15 lines from memory.</strong></p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — the 15-line DDPM training step</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+T = 1000
+beta = torch.linspace(1e-4, 0.02, T); alpha = 1 - beta
+alpha_bar = torch.cumprod(alpha, dim=0)
+
+class TinyDenoiser(nn.Module):
+    def __init__(self, d=28*28):
+        super().__init__()
+        self.net = nn.Sequential(nn.Linear(d + 1, 256), nn.GELU(), nn.Linear(256, d))
+    def forward(self, x, t):
+        h = torch.cat([x.flatten(1), t[:, None].float() / 1000], dim=1)
+        return self.net(h).view_as(x)
+
+model = TinyDenoiser()
+opt = torch.optim.Adam(model.parameters(), lr=1e-3)
+
+# One training step:
+x0  = torch.randn(32, 1, 28, 28)                 # batch (use MNIST in A7)
+t   = torch.randint(0, T, (32,))                 # random timesteps
+eps = torch.randn_like(x0)                       # noise
+ab  = alpha_bar[t].view(-1, 1, 1, 1)
+xt  = ab.sqrt() * x0 + (1 - ab).sqrt() * eps
+
+opt.zero_grad()
+loss = F.mse_loss(model(xt, t), eps)             # L_simple
+loss.backward(); opt.step()
+print("loss:", loss.item())</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: why does dropping the per-timestep weighting (going from L_vlb to L_simple) actually improve sample quality?</summary>
           <div class="answer">The principled VLB weighting heavily emphasizes the low-noise timesteps (small <code>t</code>), where the KL terms have small variance. Empirically those steps are easy and don't need the gradient signal. The "incorrect" uniform weighting puts more emphasis on the high-noise steps that are harder and actually shape the global structure of samples. It's a case where the empirically chosen objective beats the variational one.</div>
@@ -908,6 +1333,31 @@ x_{t-1} = μ̃ + σ_t · z</code></pre>
 x_{t-1} = √ᾱ_{t-1} · x̂₀ + √(1-ᾱ_{t-1}) · ε̂</code></pre>
         <p>Pick any subsequence of timesteps you want (say <code>[1000, 900, 800, ..., 100, 0]</code> for 10 steps). Same trained model — different sampler.</p>
         <p><strong>The big idea</strong>: training and sampling are decoupled. You train once with the DDPM objective, and at inference time you can swap in any solver (DDPM, DDIM, DPM-Solver++, Heun, Euler, etc.). Modern samplers like DPM-Solver++ can produce decent samples in 10-20 steps. This is why distillation (consistency models, rectified flow) can squeeze it down to 1-4 steps.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — DDIM stepping (no retraining needed)</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+
+T = 1000
+beta = torch.linspace(1e-4, 0.02, T); alpha = 1 - beta
+alpha_bar = torch.cumprod(alpha, dim=0)
+
+# Substitute your trained eps_theta here. We use zeros for shape-checking only.
+def eps_theta(xt, t):
+    return torch.zeros_like(xt)
+
+def ddim_step(xt, t_curr, t_next):
+    ab_c, ab_n = alpha_bar[t_curr], alpha_bar[t_next]
+    eps = eps_theta(xt, t_curr)
+    x0_hat = (xt - (1 - ab_c).sqrt() * eps) / ab_c.sqrt()
+    return ab_n.sqrt() * x0_hat + (1 - ab_n).sqrt() * eps
+
+x = torch.randn(4, 1, 28, 28)
+schedule = torch.linspace(T - 1, 0, steps=10).long()   # 10 DDIM steps
+for i in range(len(schedule) - 1):
+    x = ddim_step(x, schedule[i].item(), schedule[i + 1].item())
+print("after 10-step DDIM:", x.shape, "mean:", x.mean().item(), "std:", x.std().item())</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: DDIM uses the same trained ε_θ as DDPM. Why is it deterministic when DDPM is stochastic?</summary>
           <div class="answer">DDPM's update injects fresh Gaussian noise <code>z</code> at each step (that's the stochastic part). DDIM derives a non-Markovian forward process that has the same marginals <code>q(x_t | x₀)</code> as DDPM but a different reverse process — one where the variance of the conditional reverse is set to 0. Same training (because what's trained depends only on the marginals), different sampling.</div>
@@ -924,6 +1374,30 @@ x_{t-1} = √ᾱ_{t-1} · x̂₀ + √(1-ᾱ_{t-1}) · ε̂</code></pre>
 <pre><code>s_θ(x_t, t) ≈ -ε_θ(x_t, t) / σ_t</code></pre>
         <p>This means DDPM and "score matching" are the same algorithm in different clothes. Better: the whole process can be written as a stochastic differential equation (SDE), and <strong>sampling = numerically solving the reverse SDE</strong>. Or its equivalent ODE (the "probability flow ODE"), which is what DDIM is doing.</p>
         <p>Why this matters: viewing diffusion through the SDE lens unlocks <strong>any ODE/SDE solver from numerical analysis</strong> as a sampler. Heun's method, Runge-Kutta, exponential integrators — all of these became diffusion samplers overnight. This is the foundation Karras 2022 (EDM) builds on.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — score = -eps / sigma</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+# At noise level sigma, the score of the noised distribution is -eps/sigma.
+
+torch.manual_seed(0)
+x      = torch.randn(1000, 2)                    # toy data
+sigma  = 0.5
+eps    = torch.randn_like(x)
+xn     = x + sigma * eps
+
+score_truth = -eps / sigma                       # known here
+print("score shape:", score_truth.shape)
+print("score sample[0]:", score_truth[0].tolist())
+
+# Langevin-like ascent on log p (toy demo, doesn't run a real network):
+eta = 1e-2
+x_walk = xn.clone()
+for _ in range(50):
+    score = -(x_walk - x) / (sigma ** 2)         # closed form for this toy
+    x_walk = x_walk + eta * score + (2 * eta) ** 0.5 * torch.randn_like(x_walk)
+print("walk mean drifted toward data:", x_walk.mean(0).tolist())</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: if you have the score function exactly, do you still need the network to be trained on multiple noise levels? Why?</summary>
           <div class="answer">Yes. The score of the data distribution alone is useless for sampling — at low density it provides no signal (you're "lost in space"). Training across multiple noise levels gives you a <em>family</em> of scores <code>s(x, σ)</code>: at high σ the noisy distribution covers the whole space and the score points toward data; at low σ the score sharpens to the data manifold. The annealing from high to low σ during sampling is essential.</div>
@@ -941,6 +1415,27 @@ x_{t-1} = √ᾱ_{t-1} · x̂₀ + √(1-ᾱ_{t-1}) · ε̂</code></pre>
         <p>where <code>w</code> is the <strong>guidance scale</strong>. <code>w=1</code> recovers the conditional model; <code>w=0</code> is unconditional; <code>w &gt; 1</code> exaggerates the difference, pushing samples toward class-typical regions.</p>
         <p><strong>Mechanistic intuition</strong>: <code>ε_cond - ε_uncond</code> is the direction in which the conditional distribution differs from the unconditional one. Walking further in that direction (w > 1) amplifies class-typical features. It works because diffusion samples are the integral of these noise-prediction signals — small shifts in the vector field compound over the trajectory.</p>
         <p><strong>Trade-off</strong>: as <code>w</code> increases, samples become more class-typical but less diverse; at extreme values (w > 15) you get saturated, oversharpened, artifacted outputs. Sweet spot for text-to-image is usually <code>w ∈ [3, 8]</code>; for video usually lower (<code>w ∈ [1.5, 4]</code>) because high CFG tends to amplify flicker.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — CFG extrapolates, doesn't average</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+
+# Pretend we have a model. Real signature: eps_theta(x_t, t, c).
+def eps_theta(x, c=None):
+    return torch.zeros_like(x) if c is None else 0.1 * c * torch.ones_like(x)
+
+x = torch.randn(1, 3, 32, 32)
+c = torch.tensor(1.0)                          # one class label
+
+print(f"{'w':&gt;6s}  ||eps_guided||  formula")
+for w in [0.0, 1.0, 1.5, 3.0, 7.0, 15.0]:
+    eps_u = eps_theta(x, None)
+    eps_c = eps_theta(x, c)
+    eps_g = eps_u + w * (eps_c - eps_u)        # CFG formula
+    coeff_u = 1 - w
+    print(f"  {w:&gt;4.1f}     {eps_g.norm():&gt;6.3f}     (1-w)*eps_u + w*eps_c  ->  coeff_u={coeff_u:+.1f}")
+# Note: for w&gt;1, coeff on eps_uncond is NEGATIVE — you're pushing AWAY from it.</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: a friend says, "CFG is just averaging the conditional and unconditional models with weights." Correct them.</summary>
           <div class="answer">No — that would be <code>(1-w)·ε_uncond + w·ε_cond</code> with <code>w ∈ [0, 1]</code>, which is just blending. CFG <em>extrapolates</em> in the direction <code>ε_cond - ε_uncond</code> with <code>w &gt; 1</code>: the formula simplifies to <code>(1-w)·ε_uncond + w·ε_cond</code>, which for <code>w &gt; 1</code> means negative weight on uncond and >100% weight on cond. It's a push <em>away</em> from the unconditional distribution, not an average.</div>
@@ -960,6 +1455,33 @@ x_{t-1} = √ᾱ_{t-1} · x̂₀ + √(1-ᾱ_{t-1}) · ε̂</code></pre>
           <li><strong>Sampler</strong>: 2nd-order Heun method is much better than Euler; this is purely a numerical analysis choice.</li>
         </ul>
         <p>The result: same data, same network capacity, much better samples — purely from design space hygiene. Read this paper carefully; the recipe (their "EDM formulation") is what most modern image-diffusion codebases now use under the hood.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — EDM preconditioning &amp; noise sampling</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+
+# EDM (Karras et al. 2022) parametrizes everything in sigma (noise std), not t.
+sigma_min, sigma_max, sigma_data = 0.002, 80.0, 0.5
+P_mean, P_std = -1.2, 1.2
+
+# Training: sample log_sigma ~ N(P_mean, P_std)
+batch = 64
+log_sigma = P_mean + P_std * torch.randn(batch)
+sigmas = log_sigma.exp().clamp(sigma_min, sigma_max)
+print("sigma quartiles (25/50/75):",
+      [round(s.item(), 3) for s in sigmas.quantile(torch.tensor([0.25, 0.5, 0.75]))])
+
+def edm_preconditioning(sigma, sigma_data=sigma_data):
+    c_skip  = sigma_data ** 2 / (sigma ** 2 + sigma_data ** 2)
+    c_out   = sigma * sigma_data / (sigma ** 2 + sigma_data ** 2).sqrt()
+    c_in    = 1.0 / (sigma ** 2 + sigma_data ** 2).sqrt()
+    c_noise = 0.25 * sigma.log()
+    return c_skip, c_out, c_in, c_noise
+
+for s in [0.01, 1.0, 80.0]:
+    cs, co, ci, cn = edm_preconditioning(torch.tensor(s))
+    print(f"sigma={s:&gt;6.2f}  c_skip={cs:.3f}  c_out={co:.3f}  c_in={ci:.4f}  c_noise={cn:.2f}")</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: in EDM, what's σ_max set to and why?</summary>
           <div class="answer">EDM uses <code>σ_max ≈ 80</code> (vs DDPM's effective <code>σ_max ≈ 1</code> after normalization). The reasoning: the highest noise level during training should genuinely look like the prior (here, isotropic Gaussian with std = σ_max). If σ_max is too small, the data distribution still has structure at the start of sampling and you're effectively sampling from a wrong prior.</div>
@@ -985,6 +1507,40 @@ L = E_{x₀, x₁, t} [ || v_θ(x_t, t) - (x₁ - x₀) ||² ]</code></pre>
           <li>Compatible with all the EDM tricks (preconditioning, log-normal time sampling).</li>
           <li>It generalizes: <em>any</em> source distribution to <em>any</em> target distribution. Image-to-image and video-to-video become natural.</li>
         </ul>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — flow matching is just velocity regression</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+# Flow matching: train v_theta to predict (x1 - x0) along x_t = (1-t)*x0 + t*x1.
+
+B, D = 64, 3 * 32 * 32
+x0 = torch.randn(B, D)                         # "data" — replace with real
+x1 = torch.randn(B, D)                         # noise
+t  = torch.rand(B, 1)                          # uniform [0, 1]
+
+xt       = (1 - t) * x0 + t * x1               # straight-line interpolation
+v_target = x1 - x0                             # velocity along it
+
+class TinyFlow(nn.Module):
+    def __init__(self, d):
+        super().__init__()
+        self.net = nn.Sequential(nn.Linear(d + 1, 256), nn.GELU(), nn.Linear(256, d))
+    def forward(self, xt, t):
+        return self.net(torch.cat([xt, t], dim=1))
+
+model = TinyFlow(D)
+opt = torch.optim.Adam(model.parameters(), lr=1e-3)
+
+opt.zero_grad()
+loss = F.mse_loss(model(xt, t), v_target)      # the whole loss
+loss.backward(); opt.step()
+print("flow-matching loss:", loss.item())
+
+# Sampling = solve ODE dx/dt = v_theta(x, t) from t=1 (noise) to t=0 (data).</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: in flow matching, what does <code>t = 0.5</code> correspond to in terms of data and noise?</summary>
           <div class="answer">A 50/50 mix: <code>x_{0.5} = 0.5·x₀ + 0.5·x₁</code>. Different from DDPM, where <code>t=0.5</code> maps via <code>ᾱ_t</code> to some non-linear mix of data and noise depending on the schedule. Flow matching's linear interpolation is what makes the velocity field natural to regress.</div>
@@ -1004,6 +1560,32 @@ L = E_{x₀, x₁, t} [ || v_θ(x_t, t) - (x₁ - x₀) ||² ]</code></pre>
           <li><strong>Shifted schedule</strong> (Chen 2023, "On the importance of noise scheduling for diffusion models"): high-resolution images need <em>more</em> noise to disrupt low-frequency structure. Naive schedules under-noise large images, so the model never learns to denoise from "structured noise." Shift the schedule to higher σ for higher resolution.</li>
         </ul>
         <p>This last point becomes critical in Phase 4 (video) and Phase 3 (high-res images). A schedule tuned for 64x64 will <em>fail visibly</em> at 512x512 because at <code>t=T</code> the largest spatial scales still carry signal.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — linear vs cosine schedule</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch, math
+
+def linear_schedule(T):
+    return torch.linspace(1e-4, 0.02, T)
+
+def cosine_schedule(T, s=0.008):
+    # Nichol &amp; Dhariwal 2021, eq. 17
+    t  = torch.linspace(0, 1, T + 1)
+    f  = torch.cos((t + s) / (1 + s) * math.pi / 2) ** 2
+    ab = f / f[0]
+    beta = 1 - ab[1:] / ab[:-1]
+    return beta.clamp(0, 0.999)
+
+T = 1000
+b_lin = linear_schedule(T); b_cos = cosine_schedule(T)
+ab_lin = torch.cumprod(1 - b_lin, dim=0)
+ab_cos = torch.cumprod(1 - b_cos, dim=0)
+
+for t in [100, 500, 900, 999]:
+    print(f"t={t:4d}  alpha_bar  linear={ab_lin[t]:.4f}  cosine={ab_cos[t]:.4f}")
+# Cosine keeps more signal at mid-t, less at high-t. At high resolution you also
+# want a SHIFTED schedule so x_T is genuinely noise.</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: a 256x256 model trained with the linear schedule from the original DDPM paper produces blurry samples with a faint trace of the input image. What's happening?</summary>
           <div class="answer">The schedule under-noises at this resolution. At <code>t = T</code> the low-frequency components of the image still have visible signal (large structures haven't been destroyed by enough small Gaussian perturbations). The model learned to start sampling from a near-Gaussian prior, but at inference you actually feed it pure Gaussian — there's a mismatch. The faint ghost is the image's mean color leaking through. Fix: cosine schedule or a shifted schedule.</div>
@@ -1034,6 +1616,42 @@ L = E_{x₀, x₁, t} [ || v_θ(x_t, t) - (x₁ - x₀) ||² ]</code></pre>
         </ol>
         <h4>Deliverable</h4>
         <p>Folder <code>phase-2/a6-forward-process/</code> with notebook, the two visualization grids, and a README paragraph explaining what you see and why cosine retains structure longer than linear.</p>
+        <div class="notebook">
+          <div class="nb-title">Colab starter</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch torchvision matplotlib</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import math
+from torchvision import datasets, transforms
+import matplotlib.pyplot as plt
+
+T = 1000
+def linear_schedule(T):  return torch.linspace(1e-4, 0.02, T)
+def cosine_schedule(T, s=0.008):
+    t = torch.linspace(0, 1, T + 1)
+    f = torch.cos((t + s) / (1 + s) * math.pi / 2) ** 2
+    ab = f / f[0]
+    return (1 - ab[1:] / ab[:-1]).clamp(0, 0.999)
+
+beta_lin = linear_schedule(T)
+alpha_bar_lin = torch.cumprod(1 - beta_lin, dim=0)
+
+def q_sample(x0, t, eps=None, ab=alpha_bar_lin):
+    if eps is None: eps = torch.randn_like(x0)
+    ab_t = ab[t].view(-1, *([1] * (x0.dim() - 1)))
+    return ab_t.sqrt() * x0 + (1 - ab_t).sqrt() * eps
+
+mnist = datasets.MNIST(".", train=True, download=True, transform=transforms.ToTensor())
+img = mnist[0][0].unsqueeze(0) * 2 - 1   # to [-1, 1]
+
+ts = [0, 50, 100, 250, 500, 750, 999]
+fig, axes = plt.subplots(1, len(ts), figsize=(14, 2))
+for ax, t in zip(axes, ts):
+    xt = q_sample(img, torch.tensor([t]))[0, 0]
+    ax.imshow(xt.numpy(), cmap="gray"); ax.set_title(f"t={t}"); ax.axis("off")
+plt.savefig("forward_process_linear.png")</code></pre></div>
+          <div class="cell"><span class="cn py">[2]</span><pre><code># TODO: verify at t=999, sample 1000 forward outputs, check mean ≈ 0, std ≈ 1.
+# TODO: repeat the grid with cosine_schedule. Compare.</code></pre></div>
+        </div>
         <ul class="checklist">
           <li><input type="checkbox" id="a6-done"><label for="a6-done">Assignment 6 deliverable pushed to GitHub.</label></li>
         </ul>
@@ -1082,6 +1700,51 @@ L = E_{x₀, x₁, t} [ || v_θ(x_t, t) - (x₁ - x₀) ||² ]</code></pre>
           <li><strong>Normalization</strong>: MNIST pixels are in [0, 1] by default; rescale to [-1, 1] before the forward process. (Otherwise the model is trying to learn a distribution with mean 0.5 from a prior with mean 0.)</li>
           <li><strong>Sampling drift</strong>: forgetting the <code>z = 0 at t = 1</code> rule. The last step should be deterministic.</li>
         </ul>
+        <div class="notebook">
+          <div class="nb-title">Colab starter</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch torchvision wandb</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch.utils.data import DataLoader
+from torchvision import datasets, transforms
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+
+T = 1000
+beta = torch.linspace(1e-4, 0.02, T, device=device)
+alpha_bar = torch.cumprod(1 - beta, dim=0)
+
+class SmallUNet(nn.Module):
+    """28x28 U-Net with time conditioning. Sketch — fill in."""
+    def __init__(self, d=64):
+        super().__init__()
+        # TODO: down(1-&gt;32 -&gt; 32-&gt;64 stride 2 -&gt; 64-&gt;128 stride 2)
+        # TODO: bottleneck attention at 7x7
+        # TODO: up mirror with skip connections
+        # TODO: time embedding: sinusoidal(t) -&gt; 2-layer MLP -&gt; add to each block
+    def forward(self, x, t):
+        raise NotImplementedError
+
+ds = datasets.MNIST(".", train=True, download=True,
+                    transform=transforms.Compose([
+                        transforms.ToTensor(),
+                        transforms.Lambda(lambda x: x * 2 - 1),
+                    ]))
+loader = DataLoader(ds, batch_size=128, shuffle=True, num_workers=2)
+model = SmallUNet().to(device)
+opt   = torch.optim.AdamW(model.parameters(), lr=2e-4)</code></pre></div>
+          <div class="cell"><span class="cn py">[2]</span><pre><code># Training step (DDPM, eps-prediction, L_simple)
+# for step in range(20_000):
+#     x0, _ = next(iter(loader)); x0 = x0.to(device)
+#     t = torch.randint(0, T, (x0.shape[0],), device=device)
+#     eps = torch.randn_like(x0)
+#     ab = alpha_bar[t].view(-1, 1, 1, 1)
+#     xt = ab.sqrt() * x0 + (1 - ab).sqrt() * eps
+#     loss = F.mse_loss(model(xt, t), eps)
+#     opt.zero_grad(); loss.backward(); opt.step()
+# TODO: EMA on model weights (decay 0.999). Sample every 2000 steps. Log to W&amp;B.</code></pre></div>
+        </div>
         <ul class="checklist">
           <li><input type="checkbox" id="a7-done"><label for="a7-done">Assignment 7 deliverable pushed to GitHub.</label></li>
         </ul>
@@ -1106,6 +1769,38 @@ L = E_{x₀, x₁, t} [ || v_θ(x_t, t) - (x₁ - x₀) ||² ]</code></pre>
         </ol>
         <h4>Deliverable</h4>
         <p>Folder <code>phase-2/a8-ddim/</code>: the six sample grids, the steps-vs-quality plot, the optional interpolation video/GIF if you do the bonus, README explaining when you'd use DDPM vs DDIM in practice.</p>
+        <div class="notebook">
+          <div class="nb-title">Colab starter</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+
+T = 1000
+beta = torch.linspace(1e-4, 0.02, T)
+alpha_bar = torch.cumprod(1 - beta, dim=0)
+
+@torch.no_grad()
+def ddim_sample(model, shape, steps=50, device="cpu"):
+    x = torch.randn(shape, device=device)
+    schedule = torch.linspace(T - 1, 0, steps + 1).long()
+    for i in range(steps):
+        t_c, t_n = schedule[i].item(), schedule[i + 1].item()
+        ab_c, ab_n = alpha_bar[t_c], alpha_bar[t_n]
+        t_batch = torch.full((shape[0],), t_c, device=device)
+        eps = model(x, t_batch)
+        x0_hat = (x - (1 - ab_c).sqrt() * eps) / ab_c.sqrt()
+        x = ab_n.sqrt() * x0_hat + (1 - ab_n).sqrt() * eps
+    return x
+
+# Load your A7 checkpoint (EMA copy), then sample at different step counts.
+# model.load_state_dict(torch.load("a7_ema.pt"))
+# for steps in [10, 25, 50, 100, 250, 1000]:
+#     samples = ddim_sample(model, (64, 1, 28, 28), steps=steps, device=device)
+#     # save grid; record time
+print("schedule example (10 steps):", torch.linspace(T - 1, 0, 11).long().tolist())</code></pre></div>
+          <div class="cell"><span class="cn py">[2]</span><pre><code># TODO: classifier-confidence eval: train a small MNIST classifier (5 min on Colab),
+#       measure how often samples are classified with high confidence at each step count.
+# TODO: latent interpolation — linearly interpolate two x_T vectors, run DDIM, make a GIF.</code></pre></div>
+        </div>
         <ul class="checklist">
           <li><input type="checkbox" id="a8-done"><label for="a8-done">Assignment 8 deliverable pushed to GitHub.</label></li>
         </ul>
@@ -1155,6 +1850,46 @@ L = E_{x₀, x₁, t} [ || v_θ(x_t, t) - (x₁ - x₀) ||² ]</code></pre>
           <li>Try v-prediction instead of ε-prediction. Compare loss curves and final FID.</li>
           <li>Implement <strong>negative prompting</strong>: <code>ε = ε(c_neg) + w · (ε(c_pos) - ε(c_neg))</code>. Generate "airplane that is NOT a bird."</li>
         </ul>
+        <div class="notebook">
+          <div class="nb-title">Colab starter</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch torchvision wandb torch-fidelity</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+device = "cuda"  # this one really needs a GPU
+
+class CIFARUNet(nn.Module):
+    """32x32x3 U-Net with class conditioning. Bigger than A7."""
+    def __init__(self, num_classes=10, d=128):
+        super().__init__()
+        # 11 = 10 classes + 1 null token for CFG
+        self.cls_embed = nn.Embedding(num_classes + 1, d)
+        self.t_embed   = nn.Sequential(nn.Linear(1, d), nn.SiLU(), nn.Linear(d, d))
+        # TODO: full down/up blocks with attention at 8x8 and 4x4
+    def forward(self, x, t, c):
+        raise NotImplementedError
+
+# Class-dropout (creates the null distribution CFG extrapolates away from)
+def cfg_dropout(c, p=0.1, null_token=10):
+    drop = torch.rand_like(c.float()) &lt; p
+    return torch.where(drop, torch.full_like(c, null_token), c)
+
+# CFG sampling step
+@torch.no_grad()
+def cfg_eps(model, x, t, c, w=3.0, null=10):
+    eps_c = model(x, t, c)
+    eps_u = model(x, t, torch.full_like(c, null))
+    return eps_u + w * (eps_c - eps_u)</code></pre></div>
+          <div class="cell"><span class="cn py">[2]</span><pre><code># Required ablations:
+# 1) Guidance scale sweep: w in {0, 1, 1.5, 3, 5, 7, 15}. Save sample grid per w.
+# 2) Sampling steps: {10, 25, 50, 100, 250} at fixed w=3.
+# 3) FID against 10k CIFAR test images for w in {0, 1, 3, 7}.
+
+# pip install torch-fidelity   # already installed above
+# from torch_fidelity import calculate_metrics
+# m = calculate_metrics(input1=samples_dir, input2="cifar10-test", fid=True)</code></pre></div>
+        </div>
         <ul class="checklist">
           <li><input type="checkbox" id="a9-done"><label for="a9-done">Assignment 9 deliverable pushed (model + ablations + writeup).</label></li>
         </ul>
@@ -1206,6 +1941,52 @@ loss = MSE( v_θ(x_t, t, c), v_target )</code></pre>
           <li>Argue for or against flow matching vs DDPM in 2 minutes, citing your own empirical results from A10.</li>
         </ul>
         <p>Have me (Code Reviewer mode) grill you on all four. Only then move to Phase 3 (image diffusion mastery — DiT, SD, MMDiT, FLUX).</p>
+        <div class="notebook">
+          <div class="nb-title">Colab starter</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch torchvision torch-fidelity</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+device = "cuda"
+
+# Same architecture as A9 — just swap the loss
+class CIFARFlow(nn.Module):
+    def __init__(self, num_classes=10, d=128):
+        super().__init__()
+        self.cls_embed = nn.Embedding(num_classes + 1, d)
+        self.t_embed   = nn.Sequential(nn.Linear(1, d), nn.SiLU(), nn.Linear(d, d))
+        # TODO: paste A9's down/up blocks here
+    def forward(self, x, t, c):
+        raise NotImplementedError
+
+def flow_matching_loss(model, x0, c):
+    B = x0.shape[0]
+    x1 = torch.randn_like(x0)                           # noise
+    t  = torch.rand(B, device=x0.device)                # uniform in [0, 1]
+    t_v = t.view(-1, 1, 1, 1)
+    xt = (1 - t_v) * x0 + t_v * x1
+    v_target = x1 - x0
+    return F.mse_loss(model(xt, t, c), v_target)
+
+# Euler sampler from t=1 -&gt; t=0
+@torch.no_grad()
+def euler_sample(model, shape, c, w=3.0, steps=16, null=10):
+    x = torch.randn(shape, device=c.device)
+    dt = 1.0 / steps
+    for i in range(steps):
+        t = torch.full((shape[0],), 1.0 - i * dt, device=c.device)
+        v_c = model(x, t, c)
+        v_u = model(x, t, torch.full_like(c, null))
+        v = v_u + w * (v_c - v_u)
+        x = x - dt * v                                  # going backwards in t
+    return x</code></pre></div>
+          <div class="cell"><span class="cn py">[2]</span><pre><code># Required comparisons (matched compute vs A9):
+# - FID at steps in {2, 4, 8, 16, 32, 64} for both flow-matching (A10) and DDPM (A9)
+# - Side-by-side sample grids at steps=4 (the dramatic comparison)
+# - Loss curves overlayed
+# - Optional reflow: sample (x0_pred, x1) pairs, retrain on those.</code></pre></div>
+        </div>
         <ul class="checklist">
           <li><input type="checkbox" id="a10-done"><label for="a10-done">Assignment 10 (capstone) shipped publicly with writeup.</label></li>
           <li><input type="checkbox" id="phase2-final"><label for="phase2-final">Phase 2 final checkpoint passed (re-explained all four concepts cold).</label></li>
@@ -1233,6 +2014,17 @@ diffusion runs on latent space         # the cheap part
 latent (4, 64, 64)   --VAE decoder-->  image (3, 512, 512)   # one decode at the end</code></pre>
         <p>This is a <strong>~64× compute reduction</strong> per training step for 512×512, and the VAE is trained once and frozen. Every modern image and video model uses this trick — even when the paper doesn't lead with it.</p>
         <p>Crucially, the VAE is <em>lossy</em>: fine details (especially text in images, tiny faces, complex textures) can be destroyed by the compression. The diffusion model can never recover what the VAE lost. This is why frontier models (SD3, FLUX) shipped <em>bigger</em> VAEs (16-channel latents instead of 4).</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — count the compute savings</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code># Attention is O(n^2). Latent diffusion shrinks n by ~64x for 512x512.
+for res in [256, 512, 1024]:
+    pixel_tokens  = (res // 2) ** 2          # patch-2 in pixel space
+    latent_tokens = (res // 8 // 2) ** 2     # 8x VAE then patch-2
+    attn_ratio    = (pixel_tokens / latent_tokens) ** 2
+    print(f"{res}x{res}: pixel_tok={pixel_tokens:&gt;6}  latent_tok={latent_tokens:&gt;5}"
+          f"  attn FLOPs ratio = {attn_ratio:&gt;5.0f}x")</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: a 1024×1024 image with an 8× spatial-compression VAE — what's the latent shape, and how does attention cost compare to pixel space?</summary>
           <div class="answer">Latent shape <code>(C, 128, 128)</code> for some channel count C (often 4 or 16). Token count for a patch-2 DiT: <code>(128/2)² = 4096</code> tokens. Pixel-space at the same resolution would be <code>(1024/2)² = 262,144</code> tokens — attention is O(n²), so ~4000× more expensive. Same model, same task, 4000× the FLOPs. That ratio is roughly why we have Stable Diffusion at all.</div>
@@ -1253,6 +2045,30 @@ latent (4, 64, 64)   --VAE decoder-->  image (3, 512, 512)   # one decode at the
         </ul>
         <p>The KL weight is the trick. A "true" VAE has KL weight ~1.0; you can sample <code>z ~ N(0, I)</code> and get plausible outputs. SD's VAE has KL ~1e-6, so latents are <em>not</em> meaningfully Gaussian — you can't sample from the latent prior. But that's fine, because in latent diffusion, the <em>diffusion model</em> samples for you.</p>
         <p>A subtle but important detail: the encoded latents have non-unit variance, so SD multiplies them by a <strong>scaling factor</strong> (0.18215 for SD1.x) before passing to the diffusion model. Forget this scaling and your samples are gibberish.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — VAE loss components</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import torch.nn.functional as F
+
+B = 4
+x       = torch.randn(B, 3, 64, 64)
+x_recon = x + 0.05 * torch.randn_like(x)            # pretend reconstruction
+mu      = torch.randn(B, 4, 8, 8)
+logvar  = torch.randn(B, 4, 8, 8)
+
+# The four losses that make a "VAE" different from an autoencoder
+l_pixel = F.l1_loss(x_recon, x)
+l_kl    = -0.5 * (1 + logvar - mu.pow(2) - logvar.exp()).mean()
+# l_lpips  = lpips_model(x, x_recon).mean()        # perceptual (frozen VGG)
+# l_adv    = -discriminator(x_recon).mean()        # PatchGAN
+
+# SD-style weighting — KL weight is tiny so latents are NOT really Gaussian
+total = 1.0 * l_pixel + 1e-6 * l_kl
+print(f"pixel L1: {l_pixel.item():.4f}")
+print(f"KL:       {l_kl.item():.4f}")
+print(f"total:    {total.item():.4f}")</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: if you removed the adversarial loss from VAE training, what would happen to your eventual diffusion samples?</summary>
           <div class="answer">VAE reconstructions become smooth/blurry. The diffusion model then learns to generate <em>blurry latents</em>, which decode to blurry images. The diffusion loss converges fine — you've just put a ceiling on output sharpness that no amount of diffusion training can break. This is why every production VAE uses GAN loss.</div>
@@ -1278,6 +2094,41 @@ x = x + gate_attn * attn( modulate(layernorm(x), shift_attn, scale_attn) )
 x = x + gate_mlp  * mlp ( modulate(layernorm(x), shift_mlp,  scale_mlp ) )</code></pre>
         <p><strong>Why "Zero"</strong>: the gate parameters are initialized to zero, so at init <em>each block is an identity map</em>. The network starts as a no-op and learns to deviate. This makes deep DiTs (28+ blocks) train stably without the elaborate warmup schedules U-Nets need.</p>
         <p><strong>Why this matters</strong>: DiT scales <em>way better</em> than U-Net. Doubling DiT params reliably improves FID; doubling U-Net params hits diminishing returns. Every frontier image and video model post-2024 is a DiT variant — SD3, FLUX, Sora, Movie Gen, HunyuanVideo, Wan, CogVideoX.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — minimal DiT block with adaLN-Zero</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import torch.nn as nn
+
+class DiTBlock(nn.Module):
+    """adaLN-Zero conditioning: gate scale init to 0 -&gt; block starts as identity."""
+    def __init__(self, d, heads, mlp_ratio=4):
+        super().__init__()
+        self.ln1  = nn.LayerNorm(d, elementwise_affine=False)
+        self.attn = nn.MultiheadAttention(d, heads, batch_first=True)
+        self.ln2  = nn.LayerNorm(d, elementwise_affine=False)
+        self.mlp  = nn.Sequential(nn.Linear(d, d * mlp_ratio), nn.GELU(),
+                                  nn.Linear(d * mlp_ratio, d))
+        # 6 modulation vectors per block: (shift, scale, gate) for attn and mlp
+        self.cond = nn.Sequential(nn.SiLU(), nn.Linear(d, 6 * d))
+        nn.init.zeros_(self.cond[-1].weight)             # zero-init = identity
+        nn.init.zeros_(self.cond[-1].bias)
+
+    def forward(self, x, c):
+        s_a, sc_a, g_a, s_m, sc_m, g_m = self.cond(c).chunk(6, dim=-1)
+        mod = lambda h, s, sc: h * (1 + sc.unsqueeze(1)) + s.unsqueeze(1)
+        h = mod(self.ln1(x), s_a, sc_a)
+        x = x + g_a.unsqueeze(1) * self.attn(h, h, h, need_weights=False)[0]
+        x = x + g_m.unsqueeze(1) * self.mlp(mod(self.ln2(x), s_m, sc_m))
+        return x
+
+blk = DiTBlock(d=384, heads=6)
+x = torch.randn(2, 256, 384)           # 256 tokens = 16x16 latent patches
+c = torch.randn(2, 384)                # time + class embedding combined
+print("output:", blk(x, c).shape)
+# Verify identity-at-init: with zero-init cond, output should equal input.
+print("identity at init:", torch.allclose(blk(x, c), x, atol=1e-5))</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: in DiT-XL/2 (the largest DiT in the original paper), what does the "/2" mean and how does it affect token count?</summary>
           <div class="answer">Patch size 2. The latent (4, 32, 32) at ImageNet 256×256 resolution gets patchified into (32/2)² = 256 tokens. Smaller patch size = more tokens = more compute but better fine-grained quality. Patch-8 would be 16 tokens — fast but loses detail. The patch-2 model achieved SOTA FID on ImageNet generation in 2022.</div>
@@ -1305,6 +2156,28 @@ x_img += attn_out[:n_img]
 x_text += attn_out[n_img:]</code></pre>
         <p><strong>Why MMDiT is better</strong>: text tokens can attend back to image tokens (cross-attention is one-way). Text features evolve through the network instead of being fixed. The joint attention discovers cross-modal interactions naturally. Empirically: better prompt adherence, especially for compositional prompts ("a red cube on top of a blue sphere").</p>
         <p>Modern video models follow MMDiT closely — text/image conditioning streams + a video token stream all attend jointly.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — cross-attention vs MMDiT joint attention</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import torch.nn as nn
+
+img = torch.randn(1, 256, 64)             # image tokens (16x16 latent patches)
+txt = torch.randn(1,  77, 64)             # text tokens (CLIP-77)
+
+# Cross-attention: image is Q, text is K/V (one-way)
+xattn = nn.MultiheadAttention(64, 4, batch_first=True)
+out_xattn, _ = xattn(img, txt, txt, need_weights=False)
+print("cross-attn output:", out_xattn.shape)         # (1, 256, 64)
+
+# MMDiT-style: concat then joint self-attention (two-way information flow)
+joint = torch.cat([img, txt], dim=1)                  # (1, 333, 64)
+mmattn = nn.MultiheadAttention(64, 4, batch_first=True)
+out_mm, _ = mmattn(joint, joint, joint, need_weights=False)
+img_out, txt_out = out_mm.split([256, 77], dim=1)
+print("MMDiT image out:", img_out.shape, "text out:", txt_out.shape)
+# In a real MMDiT, separate Linear weights per modality but ONE attention op.</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: SD2 had 1024-token text inputs but you couldn't usefully feed it a 500-word prompt. Why?</summary>
           <div class="answer">Cross-attention treats text as static keys/values. The CLIP text encoder was trained on short alt-text (3-10 words on average); long prompts get encoded into representations that the diffusion U-Net never learned to attend to. MMDiT helps somewhat because text representations co-evolve, but the bigger fix is just using a much larger text encoder (T5-XXL) — see next card.</div>
@@ -1324,6 +2197,26 @@ x_text += attn_out[n_img:]</code></pre>
         </ul>
         <p>SD3 and FLUX use <strong>multiple encoders concatenated</strong>: CLIP-L (semantic alignment), CLIP-G (more capacity), and T5-XXL (long-prompt parsing). The features are projected and either concatenated (SD3) or routed into separate streams (FLUX).</p>
         <p><strong>The practical lesson</strong>: if your model is bad at prompts, before scaling the diffusion model, swap in a bigger text encoder. It's the cheapest improvement available.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — encode prompts with CLIP</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch transformers</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+from transformers import CLIPTokenizer, CLIPTextModel
+
+tok = CLIPTokenizer.from_pretrained("openai/clip-vit-base-patch32")
+enc = CLIPTextModel.from_pretrained("openai/clip-vit-base-patch32").eval()
+
+prompts = [
+    "a small blue dragon Pokemon",
+    "a green leaf-type Pokemon with red eyes, looking happy",
+]
+ids = tok(prompts, padding=True, truncation=True, return_tensors="pt")
+with torch.no_grad():
+    feats = enc(**ids).last_hidden_state
+print("text features:", feats.shape)         # (2, seq_len, d_text)
+print("pooled    :", feats.mean(dim=1).shape)
+# For SD3/FLUX-grade prompt understanding, swap in T5-XXL (5B params).</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: T5-XXL has ~5B params, vs ~700M for CLIP-G. If T5 is so much better, why do SD3/FLUX still use CLIP-G?</summary>
           <div class="answer">CLIP was trained to align text and images in a shared space; its embeddings carry visual concept information that pure language models don't. T5-XXL parses syntax beautifully but doesn't "know what blue looks like" in the way CLIP does. Combining them gives both: T5 handles compositional structure, CLIP handles visual grounding. The concatenation is computationally cheap (text encoding is one-shot per prompt) so there's no reason not to use both.</div>
@@ -1341,6 +2234,22 @@ x_text += attn_out[n_img:]</code></pre>
         <p><strong>Solution 2 — logit-normal time sampling</strong> (SD3): instead of sampling <code>t ~ Uniform[0, 1]</code> during training, sample <code>t ~ logit_normal(0, 1)</code> — biased toward middle-t values where the loss is most informative.</p>
         <p><strong>Solution 3 — direct logSNR parameterization</strong> (Kingma &amp; Gao 2023): parameterize the schedule by log signal-to-noise ratio (logSNR) directly. Cleaner to reason about and the natural variable for many derivations.</p>
         <p>FLUX uses a shifted rectified-flow schedule. SD3 uses logit-normal time sampling on top of rectified flow. These choices look like minor knobs but visibly improve sample quality on benchmarks.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — logit-normal time sampling (SD3-style)</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+
+batch = 10_000
+t_uniform = torch.rand(batch)
+t_logitn  = torch.sigmoid(torch.randn(batch))           # logit-normal(0, 1)
+
+print(f"{'bucket':&gt;12s} {'uniform':&gt;10s} {'logitN':&gt;10s}")
+for lo, hi in [(0, 0.2), (0.2, 0.4), (0.4, 0.6), (0.6, 0.8), (0.8, 1.0)]:
+    pu = ((t_uniform &gt;= lo) &amp; (t_uniform &lt; hi)).float().mean().item()
+    pl = ((t_logitn  &gt;= lo) &amp; (t_logitn  &lt; hi)).float().mean().item()
+    print(f"  [{lo:.1f},{hi:.1f}]  {pu:&gt;10.3f} {pl:&gt;10.3f}")
+# Logit-normal concentrates around t=0.5 — more training where loss is informative.</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: a researcher trains a flow-matching model at 256×256 with the same schedule that worked for 64×64. Samples are oversaturated and missing detail. What's the likely cause?</summary>
           <div class="answer">Under-noising at high t. The training never sees x_t values close to pure noise — there's still low-frequency structure leaking through. At inference you start from <em>real</em> Gaussian noise, which is a distribution shift from training. The model's denoising path is calibrated for "noise plus some residual signal," so it pushes generations toward a mean (oversaturated, less detail). Fix: shift the schedule.</div>
@@ -1368,6 +2277,23 @@ x_text += attn_out[n_img:]</code></pre>
           <li><strong>Hyper-SD, DMD</strong>: more recent advances pushing toward 1-step samples.</li>
         </ul>
         <p><strong>Practical guidance</strong>: train with DDPM/flow-matching objective, sample with DPM-Solver++ or UniPC. Only worry about distillation when your <em>specific application</em> needs real-time generation — it adds complexity and doesn't improve quality, just speed.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — swap samplers on the same model</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q diffusers torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>from diffusers.schedulers import (
+    DPMSolverMultistepScheduler,
+    UniPCMultistepScheduler,
+    EulerDiscreteScheduler,
+    HeunDiscreteScheduler,
+)
+
+# Each takes the same trained eps/v model but defines a different ODE solver.
+for cls in [DPMSolverMultistepScheduler, UniPCMultistepScheduler,
+            EulerDiscreteScheduler, HeunDiscreteScheduler]:
+    sched = cls()
+    sched.set_timesteps(num_inference_steps=20)
+    print(f"{cls.__name__:&lt;36s}  first 5 timesteps: {[int(t) for t in sched.timesteps[:5]]}")</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: a friend says, "DPM-Solver works because it uses higher-order ODE methods." Sharpen the answer.</summary>
           <div class="answer">Higher-order ODE methods alone won't do much because the diffusion ODE has a near-singular term near σ=0. DPM-Solver decomposes the ODE into a known linear part (exactly integrable) + a learned nonlinear part (the network), then applies higher-order integration to just the nonlinear part. That's the trick: an "exponential integrator" tailored to diffusion's specific structure. Generic RK methods would need ~50 steps where DPM-Solver gets the same quality in 15.</div>
@@ -1388,6 +2314,24 @@ x_text += attn_out[n_img:]</code></pre>
           <li><strong>VAE drift</strong>: long video generation in latent space sometimes shows slow color/brightness drift because the VAE wasn't designed to be temporally stable. Causal 3D VAEs (Phase 4) help.</li>
           <li><strong>Don't fine-tune the VAE casually</strong>: if you finetune your VAE after training your diffusion model, all your diffusion-model weights are calibrated to the old latent distribution. You'd have to retrain. Frontier labs decide on VAE first and freeze it.</li>
         </ul>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — VAE round-trip + scaling factor</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q diffusers torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+from diffusers import AutoencoderKL
+
+vae = AutoencoderKL.from_pretrained("stabilityai/sd-vae-ft-mse").eval()
+SCALE = 0.18215                                                       # SD1.x
+
+img = torch.rand(1, 3, 256, 256) * 2 - 1                              # in [-1, 1]
+with torch.no_grad():
+    z = vae.encode(img).latent_dist.sample() * SCALE
+    recon = vae.decode(z / SCALE).sample
+print("latent shape:", z.shape)                                       # (1, 4, 32, 32)
+print("recon shape: ", recon.shape)
+print("L2 round-trip error:", (img - recon).pow(2).mean().sqrt().item())
+# Fine detail (text, faces, fabric textures) takes the biggest hit.</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: you load a pretrained SD VAE, encode an image of a printed page of text, then decode. The text is unreadable. Why, and what would you do about it?</summary>
           <div class="answer">The 8× spatial compression destroys high-frequency detail like small text. The VAE was trained on natural images, not documents, and the perceptual loss doesn't penalize text legibility. Fixes: (1) finetune the VAE with text-heavy training data and a text-OCR-aware loss, or (2) use a higher-channel VAE (SD3/FLUX's 16-ch help), or (3) generate text at higher resolution where each glyph spans more pixels, or (4) use post-hoc super-resolution. There's no diffusion-side fix.</div>
@@ -1417,6 +2361,49 @@ x_text += attn_out[n_img:]</code></pre>
         </ol>
         <h4>Deliverable</h4>
         <p>Folder <code>phase-3/a11-vae/</code>: model code, training script, reconstruction grids, val LPIPS in a table, README explaining what each loss contributes (run an ablation if you have time — drop LPIPS, drop GAN, observe).</p>
+        <div class="notebook">
+          <div class="nb-title">Colab starter</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch torchvision lpips wandb</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import lpips
+
+device = "cuda"
+
+class Encoder(nn.Module):
+    """64x64x3 -&gt; 16x16x4 latent (4x spatial down, 4 channels)."""
+    def __init__(self):
+        super().__init__()
+        # TODO: ResNet blocks with GroupNorm + SiLU, two downsampling stages
+    def forward(self, x):
+        raise NotImplementedError                # returns mu (B,4,16,16), logvar (B,4,16,16)
+
+class Decoder(nn.Module):
+    def __init__(self):
+        super().__init__()
+        # TODO: mirror of encoder
+    def forward(self, z):
+        raise NotImplementedError
+
+class PatchDiscriminator(nn.Module):
+    def __init__(self):
+        super().__init__()
+        # TODO: PatchGAN — Conv2d downsampling, leaky ReLU, single-channel output
+    def forward(self, x):
+        raise NotImplementedError
+
+lpips_fn = lpips.LPIPS(net="alex").to(device)
+
+def vae_loss(x, x_hat, mu, logvar, disc, kl_w=1e-6, adv_w=0.5):
+    l_pix   = F.l1_loss(x_hat, x)
+    l_lpips = lpips_fn(x_hat, x).mean()
+    l_kl    = -0.5 * (1 + logvar - mu.pow(2) - logvar.exp()).mean()
+    l_adv   = -disc(x_hat).mean()
+    return l_pix + l_lpips + kl_w * l_kl + adv_w * l_adv</code></pre></div>
+          <div class="cell"><span class="cn py">[2]</span><pre><code># KL weight schedule: 0 for first 5k steps (pure autoencoder), then ramp to 1e-6.
+# Train ~50k steps on CelebA-HQ 64x64. Eval: reconstruction grid + LPIPS on val.</code></pre></div>
+        </div>
         <ul class="checklist">
           <li><input type="checkbox" id="a11-done"><label for="a11-done">Assignment 11 deliverable pushed (or explicitly skipped — recorded in your repo).</label></li>
         </ul>
@@ -1444,6 +2431,44 @@ vae = AutoencoderKL.from_pretrained("stabilityai/sd-vae-ft-mse")</code></pre>
         </ol>
         <h4>Deliverable</h4>
         <p>Folder <code>phase-3/a12-latent-dataset/</code>: encoding script, the sanity-check grid, the failure-mode documentation (with images), latent statistics writeup. The cached latents themselves can stay local — just commit the metadata.</p>
+        <div class="notebook">
+          <div class="nb-title">Colab starter</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q diffusers torch torchvision lpips</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+from diffusers import AutoencoderKL
+from torchvision import datasets, transforms
+import lpips
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+vae   = AutoencoderKL.from_pretrained("stabilityai/sd-vae-ft-mse").to(device).eval()
+SCALE = 0.18215                                        # SD1.x
+
+tfm = transforms.Compose([
+    transforms.Resize(256),
+    transforms.CenterCrop(256),
+    transforms.ToTensor(),
+    transforms.Lambda(lambda x: x * 2 - 1),            # to [-1, 1]
+])
+
+# Replace path with your dataset (CelebA-HQ, pokemon-blip-captions, etc.)
+# ds = datasets.ImageFolder("path/to/images", transform=tfm)
+
+# Encode all images and save latents
+# all_z = []
+# with torch.no_grad():
+#     for img, _ in DataLoader(ds, batch_size=8):
+#         z = vae.encode(img.to(device)).latent_dist.sample() * SCALE
+#         all_z.append(z.cpu())
+# torch.save(torch.cat(all_z), "latents.pt")</code></pre></div>
+          <div class="cell"><span class="cn py">[2]</span><pre><code># Sanity: round-trip 10 random images, compute LPIPS distance
+lp = lpips.LPIPS(net="alex").to(device)
+def round_trip(img):
+    with torch.no_grad():
+        z = vae.encode(img.to(device)).latent_dist.sample() * SCALE
+        return vae.decode(z / SCALE).sample
+# stress test: face, text image, fine fabric, edge detail
+# document what the VAE loses</code></pre></div>
+        </div>
         <ul class="checklist">
           <li><input type="checkbox" id="a12-done"><label for="a12-done">Assignment 12 deliverable pushed.</label></li>
         </ul>
@@ -1484,6 +2509,37 @@ vae = AutoencoderKL.from_pretrained("stabilityai/sd-vae-ft-mse")</code></pre>
           <li>Patchification bug: <code>nn.Unfold</code> vs <code>Conv2d</code> stride trick — pick one and test the round-trip.</li>
           <li>Positional embedding shape mismatch when sequence length changes. Be explicit about the maximum.</li>
         </ul>
+        <div class="notebook">
+          <div class="nb-title">Colab starter</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch diffusers wandb einops</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import torch.nn as nn
+
+class PatchEmbed(nn.Module):
+    def __init__(self, in_ch=4, hidden=384, patch=2):
+        super().__init__()
+        self.proj = nn.Conv2d(in_ch, hidden, kernel_size=patch, stride=patch)
+    def forward(self, x):
+        # x: (B, 4, 32, 32) -&gt; (B, hidden, 16, 16) -&gt; (B, 256, hidden)
+        return self.proj(x).flatten(2).transpose(1, 2)
+
+class DiT(nn.Module):
+    """DiT-S/2 for 32x32 latents — 12 blocks, ~33M params."""
+    def __init__(self, depth=12, hidden=384, heads=6, num_classes=10, patch=2):
+        super().__init__()
+        self.patch_embed = PatchEmbed(4, hidden, patch=patch)
+        self.pos_embed   = nn.Parameter(torch.zeros(1, 256, hidden))
+        self.cls_embed   = nn.Embedding(num_classes + 1, hidden)
+        self.t_embed     = nn.Sequential(nn.Linear(1, hidden), nn.SiLU(),
+                                          nn.Linear(hidden, hidden))
+        # TODO: stack DiTBlock with adaLN-Zero (see concept 19) x depth
+        # TODO: final layer: norm + Linear to patch_size^2 * 4_channels, un-patchify
+    def forward(self, x, t, c):
+        raise NotImplementedError</code></pre></div>
+          <div class="cell"><span class="cn py">[2]</span><pre><code># Drop in your A9 DDPM training loop. Just replace the U-Net with DiT.
+# Use the latents from A12 as input — much cheaper than pixel-space training.
+# 50k-100k steps. Expect 8-15 GPU-hours on A100. EMA 0.9999. AdamW lr=1e-4.</code></pre></div>
+        </div>
         <ul class="checklist">
           <li><input type="checkbox" id="a13-done"><label for="a13-done">Assignment 13 deliverable pushed.</label></li>
         </ul>
@@ -1521,6 +2577,46 @@ tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
         <p>Folder <code>phase-3/a14-text-dit/</code>: cross-attention DiT, training script, prompt-to-image grid with 8-12 prompts, README on what works and what doesn't with a small text-encoder/small-data setup. Document the limits — your model will not be SD; that's not the point. The point is the architecture.</p>
         <h4>Stretch — MMDiT</h4>
         <p>If you have appetite, refactor to MMDiT: text and image tokens share a joint sequence with separate modality-specific MLPs but joint attention. Compare with cross-attention version on same data. Two-line summary: which one converged faster, which one produced better composition?</p>
+        <div class="notebook">
+          <div class="nb-title">Colab starter</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch transformers diffusers wandb</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import torch.nn as nn
+from transformers import CLIPTokenizer, CLIPTextModel
+
+device = "cuda"
+tok = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
+txt_enc = CLIPTextModel.from_pretrained("openai/clip-vit-large-patch14").to(device).eval()
+
+def encode_prompts(prompts):
+    ids = tok(prompts, padding="max_length", max_length=77,
+              truncation=True, return_tensors="pt").to(device)
+    with torch.no_grad():
+        return txt_enc(**ids).last_hidden_state              # (B, 77, 768)
+
+class CrossAttnDiTBlock(nn.Module):
+    """Add cross-attention to image-queries / text-keys-values."""
+    def __init__(self, d, heads, d_text=768):
+        super().__init__()
+        # TODO: self-attn (image-to-image)
+        # TODO: cross-attn (image queries, text K/V) — project text to d if d_text != d
+        # TODO: MLP
+        # All three with adaLN-Zero gating from time + class embedding
+        pass
+    def forward(self, x, t_emb, txt_emb):
+        raise NotImplementedError
+
+# Random caption dropout for CFG
+def maybe_drop_caption(captions, p=0.1):
+    return [c if torch.rand(1).item() &gt; p else "" for c in captions]</code></pre></div>
+          <div class="cell"><span class="cn py">[2]</span><pre><code># Datasets to try (in order of difficulty):
+#   "lambdalabs/pokemon-blip-captions"        — 833 captioned Pokemon
+#   small LAION subset (~50-200k)             — variety
+#   custom scrape with BLIP-2 captioning      — niche domain
+
+# Train with CFG dropout p=0.1. Sample with w in [3, 7].
+# Test prompts: "a small blue dragon Pokemon", "a green leaf-type Pokemon with red eyes".</code></pre></div>
+        </div>
         <ul class="checklist">
           <li><input type="checkbox" id="a14-done"><label for="a14-done">Assignment 14 deliverable pushed.</label></li>
         </ul>
@@ -1583,6 +2679,45 @@ tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
           <li>Describe at least three VAE quirks that will bite future-you (concept 24).</li>
         </ul>
         <p>Have me (Code Reviewer mode) grill you on all five. Only then move to Phase 4 (video diffusion core — this is where the hiring path actually opens).</p>
+        <div class="notebook">
+          <div class="nb-title">Colab/RunPod starter — modern training recipe</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch transformers diffusers accelerate wandb gradio huggingface_hub</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from transformers import T5Tokenizer, T5EncoderModel
+from diffusers import AutoencoderKL
+
+device = "cuda"
+
+# Frozen modules — VAE and text encoder are pretrained
+vae    = AutoencoderKL.from_pretrained("stabilityai/sd-vae-ft-mse").to(device).eval()
+t5_tok = T5Tokenizer.from_pretrained("google/flan-t5-small")
+t5_enc = T5EncoderModel.from_pretrained("google/flan-t5-small").to(device).eval()
+for p in vae.parameters():    p.requires_grad = False
+for p in t5_enc.parameters(): p.requires_grad = False
+
+# DiT-B/2 config (~130M params)
+config = dict(depth=12, hidden=768, heads=12, patch=2, in_channels=4)
+
+# Rectified-flow training step
+def rectified_flow_step(model, x0, txt_emb):
+    B = x0.shape[0]
+    x1 = torch.randn_like(x0)
+    t  = torch.sigmoid(torch.randn(B, device=device))     # logit-normal time
+    t_v = t.view(-1, 1, 1, 1)
+    xt = (1 - t_v) * x0 + t_v * x1
+    return F.mse_loss(model(xt, t, txt_emb), x1 - x0)</code></pre></div>
+          <div class="cell"><span class="cn py">[2]</span><pre><code># Training: AdamW lr=1e-4, cosine + 1000-step warmup, bf16 autocast,
+# gradient clipping at 1.0, EMA 0.9999, gradient accumulation if needed,
+# 80-150k steps, 30-60 GPU-hours on a single H100.
+
+# Sampling: Euler/Heun ODE from t=1 -&gt; t=0. CFG with negative prompts. 25/15/10/4 steps.
+
+# Deploy: push weights to HF Hub, create Gradio Space.
+# from huggingface_hub import HfApi
+# HfApi().upload_folder(repo_id="USERNAME/my-small-dit", folder_path="./ckpt")</code></pre></div>
+        </div>
         <ul class="checklist">
           <li><input type="checkbox" id="a15-done"><label for="a15-done">Assignment 15 (capstone) shipped publicly with demo + writeup.</label></li>
           <li><input type="checkbox" id="phase3-final"><label for="phase3-final">Phase 3 final checkpoint passed (re-explained all five concepts cold).</label></li>
@@ -1611,6 +2746,23 @@ tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
         </ul>
         <p>Everything else carries over from your Phase 3 DiT: adaLN-Zero conditioning, text encoders (T5/CLIP), rectified flow objective, modern samplers, CFG. The math is identical.</p>
         <p><strong>What gets harder</strong>: memory (longer sequences), compute (O(n²) attention bites), and data (video datasets are 10-1000× bigger than image datasets). The architecture is easy; the engineering is everything.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — token-count math, image vs video DiT</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>def tokens(latent, patch):
+    C, T, H, W = latent
+    pt, ph, pw = patch
+    return (T // pt) * (H // ph) * (W // pw)
+
+img       = tokens((4,  1, 32,  32), (1, 2, 2))         # image DiT @ 256x256
+vid_short = tokens((4,  8, 64,  64), (1, 2, 2))         # 8 frames, 512x512 latent
+vid_long  = tokens((16, 16, 90, 160),(1, 2, 2))         # 720p-ish, 16 frames
+
+print(f"image DiT     : {img:&gt;8,d} tokens")
+print(f"video DiT (S) : {vid_short:&gt;8,d} tokens   attn vs image: {(vid_short/img)**2:.0f}x")
+print(f"video DiT (L) : {vid_long:&gt;8,d} tokens   attn vs image: {(vid_long/img)**2:.0f}x")
+# This ratio is why sequence parallelism (concept 31) is mandatory at scale.</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: a video latent of shape <code>(16, 8, 64, 64)</code> (channels × frames × height × width) with 3D patch <code>(1, 2, 2)</code> — how many tokens does the DiT see, and what's the attention cost compared to the equivalent image DiT on a single 256×256 image?</summary>
           <div class="answer">Token count: <code>(8/1) × (64/2) × (64/2) = 8 × 32 × 32 = 8192</code> tokens. The image DiT on 256×256 with VAE-compressed (4, 32, 32) latent and patch 2 sees 256 tokens. Attention is O(n²), so the video case is (8192/256)² = 1024× more attention FLOPs. That ratio is why sequence parallelism (concept 31) matters — and why a single GPU can't fit frontier video training.</div>
@@ -1630,6 +2782,31 @@ tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
           <li><strong>Streaming</strong>: a generated video can be decoded chunk-by-chunk as new latent frames are produced, without waiting for the whole sequence.</li>
         </ul>
         <p>Modern 3D VAEs in the wild: CogVideoX VAE (clean reference), Mochi VAE, Wan VAE, HunyuanVideo VAE. They're surprisingly similar — frontier labs converged on a recipe. Treat the VAE as something you load pretrained, not something you'd train from scratch unless you have weeks of GPU.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — causal 3D conv</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class CausalConv3d(nn.Module):
+    """Pad only on the PAST side of the temporal axis."""
+    def __init__(self, c_in, c_out, k_t=3, k_h=3, k_w=3):
+        super().__init__()
+        self.pad = (k_w // 2, k_w // 2, k_h // 2, k_h // 2, k_t - 1, 0)
+        self.conv = nn.Conv3d(c_in, c_out, kernel_size=(k_t, k_h, k_w))
+    def forward(self, x):
+        return self.conv(F.pad(x, self.pad))
+
+conv = CausalConv3d(3, 8)
+v = torch.randn(1, 3, 4, 16, 16)
+print("output shape:", conv(v).shape)            # same T, H, W
+
+# Verify causality: changing future frames cannot affect past outputs.
+v2 = v.clone(); v2[:, :, 2:] = torch.randn_like(v2[:, :, 2:])
+out1, out2 = conv(v), conv(v2)
+print("past unaffected by future:", torch.allclose(out1[:, :, :2], out2[:, :, :2]))</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: a non-causal 3D VAE would, in principle, give better reconstructions than a causal one. Why is causality worth the cost?</summary>
           <div class="answer">A non-causal 3D VAE peeks forward in time during encoding, which gives slightly better latent quality. But it (1) cannot encode a single image, (2) cannot be used for streaming generation (the diffusion model would need to know all future latents to decode any single frame correctly), and (3) doesn't match how autoregressive video generation works at inference. The tiny reconstruction quality loss is worth the architectural flexibility. Every frontier video VAE is causal.</div>
@@ -1646,6 +2823,32 @@ tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
         <p><strong>2. Factorized space-time attention</strong>: alternate spatial attention (within each frame) with temporal attention (within each pixel position across frames). Cheaper: O((H·W)² · T) + O(T² · H·W) instead of O((T·H·W)²). Used by earlier video models (Imagen Video, Make-A-Video). Less expressive for diagonal interactions ("this object moves <em>and</em> changes color").</p>
         <p><strong>3. Windowed 3D attention</strong>: split tokens into local 3D windows (e.g., 4 frames × 16×16 patches), attend within windows, occasionally shift windows. Swin-style. Used by some efficient video models and LTX-Video.</p>
         <p>The frontier (Sora-class) trend is full 3D attention + engineering (FlashAttention, Ulysses, etc.) to make it fit. The "smarter attention" variants matter less when raw compute is available.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — three attention layouts on the same tensor</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch einops</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+from einops import rearrange
+
+B, T, H, W, C = 1, 4, 8, 8, 32
+x = torch.randn(B, T, H, W, C)
+
+# 1) Full 3D attention — every token attends to every other
+x_full = rearrange(x, "b t h w c -&gt; b (t h w) c")
+print("full 3D     : seq_len =", x_full.shape[1])
+
+# 2) Factorized — spatial first, then temporal
+x_spatial  = rearrange(x, "b t h w c -&gt; (b t) (h w) c")
+x_temporal = rearrange(x, "b t h w c -&gt; (b h w) t c")
+print("factorized  : spatial seq =", x_spatial.shape[1],
+      "  temporal seq =", x_temporal.shape[1])
+
+# 3) Windowed 3D (Swin-style)
+wt, wh, ww = 2, 4, 4
+x_win = rearrange(x, "b (nt wt) (nh wh) (nw ww) c -&gt; (b nt nh nw) (wt wh ww) c",
+                  wt=wt, wh=wh, ww=ww)
+print("windowed    : seq per window =", x_win.shape[1],
+      "  windows =", x_win.shape[0])</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: factorized attention can't represent a token "object that moves across frames and changes color simultaneously." Why?</summary>
           <div class="answer">Factorized attention applies spatial attention (frame-by-frame, no temporal info) then temporal attention (pixel-by-pixel, no spatial info). To represent "object moves AND changes color," the model needs joint reasoning over the spatial and temporal axes in the same operation — a single attention head needs Q over a spatial position at time t to find K at a different spatial position at time t+k. Factorized attention can only approximate this through sequential composition, and it's empirically worse for fast-motion content.</div>
@@ -1662,6 +2865,28 @@ tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
         <p><strong>Image-to-video (I2V)</strong>: first frame is given; generate the next 15-127 frames. Mechanism: encode the input image through the VAE, place its latent at temporal position 0 of the noise tensor, run diffusion only on positions 1..T. Or concatenate the conditioning latent channel-wise (frame 0 latent is repeated and concatenated to noise input). This is the most commercially deployed mode — easier than T2V because the visual content is mostly given.</p>
         <p><strong>Video-to-video (V2V)</strong>: a full input video is given, generate a stylistically-modified one. Used for style transfer, video editing, motion-preserving regeneration. Mechanism: use the input video as a condition (encoded latent, or pose/depth extraction), apply diffusion conditioned on this.</p>
         <p>Frontier models train <em>multi-task</em>: a single model handles T2V, I2V, V2V depending on which conditioning is present. Frame masking during training is the trick — randomly mask out some frames, the model learns to generate the missing ones from the context.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — frame-mask conditioning for I2V/V2V</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+
+T, C, H, W = 16, 4, 32, 32
+
+# I2V: first frame is GIVEN, rest is noise
+first_frame_latent = torch.randn(1, C, 1, H, W)
+noise              = torch.randn(1, C, T - 1, H, W)
+i2v_input          = torch.cat([first_frame_latent, noise], dim=2)
+
+# Frame mask: 1 = this frame is noise (model should denoise), 0 = condition (frozen)
+mask = torch.cat([torch.zeros(1, 1, 1, 1, 1),
+                  torch.ones(1, 1, T - 1, 1, 1)], dim=2)
+print("input:", i2v_input.shape, "  mask:", mask.shape)
+
+# General-purpose multi-task training: randomly drop frames per example
+# Then the same model does T2V (all noise), I2V (frame 0 given), V2V (other masks)
+random_mask = torch.bernoulli(torch.full((1, 1, T, 1, 1), 0.7))
+print("random training mask, # frames as noise:", int(random_mask.sum()))</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: an I2V model is trained with the first frame always given. At inference, can you ask it to fill in only the middle frames (give frame 0 and frame T-1)?</summary>
           <div class="answer">Not reliably. The model has only ever seen the conditioning at temporal position 0; it doesn't know what to do with conditioning at other positions. To support "interpolation" between two given frames, train with a more flexible mask strategy — randomly mask any subset of frames during training. Then at inference, mask matches your use case.</div>
@@ -1682,6 +2907,26 @@ tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
           <li><strong>Long-context training</strong>: just train on longer sequences with sequence parallelism. Expensive but cleanest. Sora's "world simulator" framing implies they trained on much longer context than most.</li>
         </ul>
         <p>The honest state of the art: 5-10 seconds is solid; 30 seconds is achievable with quality loss; 1 minute+ with consistent characters is still a research problem.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — overlap-and-blend chunked sampling</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import math
+import torch
+
+chunk_len, overlap, n_chunks = 16, 4, 5
+total = chunk_len + (chunk_len - overlap) * (n_chunks - 1)
+print(f"chunk_len={chunk_len}, overlap={overlap}, "
+      f"chunks={n_chunks}, total frames={total}")
+
+def cosine_blend(n):
+    return 0.5 - 0.5 * torch.cos(torch.linspace(0, math.pi, n))
+
+w = cosine_blend(overlap)
+print("blend weights (overlap region):", [round(x.item(), 3) for x in w])
+
+# At inference: generate chunk_i, condition chunk_{i+1} on the last `overlap`
+# frames of chunk_i, blend overlap regions linearly with cosine_blend weights.</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: autoregressive chunking drifts. What's the underlying reason, in one sentence?</summary>
           <div class="answer">Each chunk's generation conditions on the previous chunk's <em>output</em>, not its <em>training distribution</em> — so generation errors compound. (This is exposure bias, same problem autoregressive language models had before scaling fixed it.) Approaches: condition on more frames, retrieval-augment from a reference, or train with teacher forcing-style chunked-input augmentation.</div>
@@ -1700,6 +2945,30 @@ tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
           <li><strong>Identity preservation</strong>: same character across a long video, or across multiple generations. Approaches: reference-image conditioning (à la IP-Adapter), LoRA-based identity tuning, or face-embedding injection. ID-Animator is a clean reference.</li>
         </ul>
         <p>Why this matters for hiring: <strong>controllability adapters are LoRA-scale finetunes</strong>, achievable with $500-3000 of compute on an open base model. They are the most cost-effective way to produce a portfolio piece that demonstrates real understanding without needing frontier compute. See Phase 7 project ideas.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — Plücker ray embeddings</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+
+def plucker_rays(H, W, K, c2w):
+    """Compute per-pixel Plücker rays (origin x direction, direction)."""
+    # K: (3, 3) intrinsics. c2w: (4, 4) camera-to-world.
+    i, j = torch.meshgrid(torch.arange(W), torch.arange(H), indexing="xy")
+    pix = torch.stack([(i - K[0, 2]) / K[0, 0],
+                       (j - K[1, 2]) / K[1, 1],
+                       torch.ones_like(i.float())], dim=-1)            # (H, W, 3)
+    dirs = pix @ c2w[:3, :3].T
+    dirs = dirs / dirs.norm(dim=-1, keepdim=True)
+    orig = c2w[:3, 3].expand_as(dirs)
+    moment = torch.cross(orig, dirs, dim=-1)                            # rxd
+    return torch.cat([moment, dirs], dim=-1)                            # (H, W, 6)
+
+K   = torch.tensor([[600.0, 0, 32], [0, 600.0, 32], [0, 0, 1.0]])
+c2w = torch.eye(4); c2w[:3, 3] = torch.tensor([0.5, 0.0, 0.0])           # camera offset
+rays = plucker_rays(64, 64, K, c2w)
+print("Plücker map:", rays.shape)                                       # (64, 64, 6)
+# Stack per-frame -&gt; (T, H, W, 6), then concat to latent channels for ControlNet-style cond.</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: why use Plücker ray embeddings instead of just passing the (3, 3) rotation matrix + (3,) translation per frame?</summary>
           <div class="answer">Plücker rays are per-pixel — they give the model spatially-distributed information about camera geometry. The model can locally compute "given this pixel's ray, what should it see?" from features near that pixel's ray. Passing a global rotation+translation matrix per frame works in theory but requires the model to learn to apply the projection itself — slower to train and weaker generalization. Plücker is a lifted, redundant representation that's friendlier for conv/attention networks.</div>
@@ -1718,6 +2987,23 @@ tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
           <li><strong>Hybrid (USP, Hunyuan-style)</strong>: combine Ulysses (across heads) and Ring (across sequence). Best of both for video-scale workloads.</li>
         </ul>
         <p>This is the topic where your distributed systems background actually shines. The mental model is identical to sharding a database — the question is what you partition by and what comm pattern that implies. <strong>HunyuanVideo's training code is the cleanest open reference</strong> for hybrid sequence parallelism.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — sharding layout (conceptual)</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch
+# Real multi-GPU usage requires torchrun + nccl backend; this is layout math only.</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code># Sequence-parallelism layout sketch — Ulysses
+n_gpu  = 4
+B, heads, T, d_head = 1, 8, 1024, 64
+
+before = (B, heads,            T // n_gpu, d_head)     # sequence-sharded
+after  = (B, heads // n_gpu,   T,          d_head)     # head-sharded (after all-to-all)
+print("Before all-to-all (per GPU):", before)
+print("After  all-to-all (per GPU):", after)
+print("Compute flash_attn on local heads, all-to-all back -&gt; same total work, distributed.")
+
+# Ring Attention: stay sequence-sharded, rotate K/V chunks around a ring.
+# Memory per GPU is O(T/n_gpu) regardless of T — that's the scaling unlock.</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: Ulysses' all-to-all communication cost scales with number of heads. Why might that be a problem for a model with grouped-query attention (GQA), and what's the workaround?</summary>
           <div class="answer">GQA shares K/V across multiple Q heads (e.g., 32 query heads grouped to 8 K/V heads). Ulysses shards across the head dim, so with only 8 K/V heads you can only shard across ≤8 GPUs. Workaround: combine with Ring attention along the sequence dim for additional GPU count, or use a sequence parallelism scheme aware of GQA structure (some recent implementations do).</div>
@@ -1746,6 +3032,24 @@ tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
           <li>Audio-visual sync (it doesn't evaluate audio).</li>
         </ul>
         <p>This is a portfolio opportunity (see A19): build an eval that probes a specific failure mode VBench misses, benchmark all open models on it, release publicly. Cheap to compute, high signal for recruiters.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — toy motion-magnitude eval</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+
+def motion_score(video):
+    """video: (T, C, H, W). Mean abs frame-to-frame diff — proxy for VBench 'dynamic degree'."""
+    return (video[1:] - video[:-1]).abs().mean(dim=(1, 2, 3))
+
+static  = torch.zeros(16, 3, 64, 64) + torch.randn(1, 3, 64, 64) * 0.01
+dynamic = torch.randn(16, 3, 64, 64)
+print("static  motion: {:.3f}".format(motion_score(static).mean().item()))
+print("dynamic motion: {:.3f}".format(motion_score(dynamic).mean().item()))
+
+# VBench measures motion smoothness, dynamic degree, subject consistency etc.
+# It does NOT measure hand-anatomy correctness, physics violations, or narrative
+# coherence — those are the gaps your A19 custom eval can fill.</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: an open-source video model claims SOTA on VBench. The samples look great but the hands are mutated. Why didn't VBench catch this?</summary>
           <div class="answer">VBench's per-frame metrics (aesthetic, imaging quality) are pretrained classifiers/VLMs that don't specifically penalize hand mutation. None of the temporal metrics check anatomical correctness — they measure smoothness, not correctness. Hand anatomy is one of the well-known VBench blind spots and the reason custom evals matter.</div>
@@ -1776,6 +3080,26 @@ tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
           <li><strong>Sharding</strong>: store as WebDataset (tar shards of clip + caption pairs) for efficient distributed loading.</li>
         </ol>
         <p>Building this pipeline is a portfolio piece on its own (A26). It's also the most-rare skill — most ML engineers never touch industrial data engineering.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — one pipeline stage: scene detection</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q scenedetect opencv-python-headless</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code># Detect shot boundaries in a video and split it into single-shot clips.
+from scenedetect import detect, ContentDetector
+
+# Pass in any video file. For a quick test, use any .mp4 you have access to.
+# scenes = detect("my_video.mp4", ContentDetector(threshold=27.0))
+# print(f"detected {len(scenes)} scenes")
+# for i, (start, end) in enumerate(scenes[:5]):
+#     print(f"scene {i}: {start.get_seconds():.2f}s -&gt; {end.get_seconds():.2f}s")
+
+# After scene split: filter by duration, aesthetic, motion -&gt; dedup -&gt; caption -&gt; shard.
+# A typical funnel keeps 1-10% of raw clips. The curation work is most of the model quality.
+print("Real pipeline structure (rough fraction of clips retained):")
+for stage, retention in [("scene-split",   1.0), ("duration filter", 0.7),
+                         ("aesthetic",     0.5), ("motion filter",  0.4),
+                         ("dedup",         0.3), ("captioning",     0.28)]:
+    print(f"  {stage:&lt;18s}: {retention*100:5.1f}% remaining")</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: a model trained on a curated 100k-clip dataset outperforms a model trained on 10M raw scraped clips, with the same compute. Two reasons.</summary>
           <div class="answer">(1) Bad data <em>actively hurts</em>: low-quality, text-burned, or duplicate clips teach the model to produce low-quality, text-burned, or repetitive outputs. (2) Compute is finite — if 90% of your training steps are on bad clips, only 10% are actually shaping the model toward good behavior. The 100k clean dataset uses 100% of steps usefully. This is the empirical finding behind every frontier model team obsessing over data.</div>
@@ -1799,6 +3123,31 @@ tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
           <li><strong>Data</strong>: most public video data has stripped or low-quality audio. Captioning audio separately doubles data work.</li>
         </ul>
         <p>For Phase 4, you don't need to ship audio. But understand it exists — it'll come up in interviews and in research direction conversations. Two minutes on Veo 3's blog post is enough familiarity.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — modality rate alignment</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+
+# Video and audio live at very different temporal rates.
+fps        = 24
+sr_audio   = 22_050
+samples_per_frame = sr_audio // fps
+print(f"{fps} fps video -&gt; {samples_per_frame} audio samples per frame")
+
+# Common approach: tokenize audio (e.g., 50 EnCodec tokens/sec at 22kHz),
+# then interleave with video tokens in one joint sequence.
+T_frames      = 16
+audio_tok_per_frame = 4                           # after compression
+T_audio_tokens      = T_frames * audio_tok_per_frame
+
+video_tokens = torch.randn(T_frames, 256)
+audio_tokens = torch.randn(T_audio_tokens, 256)
+modality     = torch.cat([torch.zeros(T_frames),
+                          torch.ones(T_audio_tokens)]).long()
+seq          = torch.cat([video_tokens, audio_tokens], dim=0)
+print("joint seq:", seq.shape, "  modality tags:", modality.shape)
+# Joint attention learns sync. Sequential generation can't recover lost sync after the fact.</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: someone proposes "let's just generate the video first, then a separate audio model conditions on the video." What's the failure mode?</summary>
           <div class="answer">Sync. The audio model can match the video temporally only as well as the audio model itself can understand it — and small temporal slippage (a few frames) is enough to break perceived lip-sync or footstep alignment. Joint generation can attend across modalities at training time and learn fine-grained sync; sequential generation can't recover what wasn't decided together. (That said, sequential is much easier to engineer, so many practical systems still do it.)</div>
@@ -1828,6 +3177,35 @@ tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
         </ol>
         <h4>Deliverable</h4>
         <p>Folder <code>phase-4/a16-video-patchify/</code>: notebook, the round-trip test, the positional embedding visualization, a README explaining the patchify/unpatchify math.</p>
+        <div class="notebook">
+          <div class="nb-title">Colab starter</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch einops decord</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+from einops import rearrange
+
+def patchify_3d(video, p_t=1, p_h=2, p_w=2):
+    """video: (B, C, T, H, W) -&gt; (B, N, p_t*p_h*p_w*C)"""
+    return rearrange(video,
+                     "b c (t pt) (h ph) (w pw) -&gt; b (t h w) (pt ph pw c)",
+                     pt=p_t, ph=p_h, pw=p_w)
+
+def unpatchify_3d(patches, T, H, W, p_t=1, p_h=2, p_w=2, C=3):
+    return rearrange(patches,
+                     "b (t h w) (pt ph pw c) -&gt; b c (t pt) (h ph) (w pw)",
+                     t=T // p_t, h=H // p_h, w=W // p_w,
+                     pt=p_t, ph=p_h, pw=p_w, c=C)
+
+# Round-trip test
+v = torch.randn(1, 3, 16, 256, 256)
+patches = patchify_3d(v, p_t=1, p_h=2, p_w=2)
+print("video shape:  ", v.shape)
+print("patches shape:", patches.shape)
+recovered = unpatchify_3d(patches, 16, 256, 256, p_t=1, p_h=2, p_w=2)
+print("round-trip exact:", torch.equal(v, recovered))</code></pre></div>
+          <div class="cell"><span class="cn py">[2]</span><pre><code># TODO: load a UCF-101 clip with decord, decode to (T, C, H, W), resize to (16, 3, 256, 256).
+# TODO: compute 3D sinusoidal positional embedding (separate freq for T, H, W). Visualize.
+# TODO: time the patchify op for (16,3,256,256) vs (128,3,512,512).</code></pre></div>
+        </div>
         <ul class="checklist">
           <li><input type="checkbox" id="a16-done"><label for="a16-done">Assignment 16 deliverable pushed.</label></li>
         </ul>
@@ -1861,6 +3239,37 @@ tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
         </ol>
         <h4>Deliverable</h4>
         <p>Folder <code>phase-4/a17-reverse-engineer/</code>: <code>NOTES.md</code> (the writeup), the 3 sample generations, and a final paragraph on the "surprising design choice" with your interpretation.</p>
+        <div class="notebook">
+          <div class="nb-title">Colab Pro / RunPod starter</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q diffusers transformers torch accelerate imageio imageio-ffmpeg</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+from diffusers import CogVideoXPipeline                 # also try Mochi, HunyuanVideo
+
+device = "cuda"
+pipe = CogVideoXPipeline.from_pretrained(
+    "THUDM/CogVideoX-2b",
+    torch_dtype=torch.float16,
+).to(device)
+# pipe.enable_sequential_cpu_offload()   # if VRAM is limited
+
+prompt = "a corgi running through a sunlit meadow, cinematic"
+video = pipe(prompt, num_inference_steps=50, guidance_scale=6).frames[0]
+
+# Save the output
+import imageio
+frames_np = [(f.cpu().numpy() * 255).clip(0, 255).astype("uint8") for f in video]
+imageio.mimsave("out.mp4", frames_np, fps=8)
+print("saved out.mp4")</code></pre></div>
+          <div class="cell"><span class="cn py">[2]</span><pre><code># NOW: explore pipe.transformer, pipe.vae, pipe.text_encoder. Read source code.
+print("Transformer class:", type(pipe.transformer).__name__)
+print("Total params:     ", sum(p.numel() for p in pipe.transformer.parameters()))
+print("VAE class:        ", type(pipe.vae).__name__)
+print("Text encoder:     ", type(pipe.text_encoder).__name__)
+
+# Write NOTES.md covering: VAE arch, DiT block structure, attention pattern,
+# text encoders, noise schedule, sampler, seq-parallel strategy, total params,
+# max ctx, plus one "surprising design choice" with your interpretation.</code></pre></div>
+        </div>
         <ul class="checklist">
           <li><input type="checkbox" id="a17-done"><label for="a17-done">Assignment 17 deliverable pushed.</label></li>
         </ul>
@@ -1912,6 +3321,47 @@ tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
           <li>FSDP wrap policy too aggressive (every Linear wrapped) — bad communication overhead. Wrap by transformer block.</li>
           <li>Eval too late — you discover at step 100k that samples don't move. Eval every 5k steps minimum.</li>
         </ul>
+        <div class="notebook">
+          <div class="nb-title">Multi-GPU starter — run with <code>torchrun --nproc-per-node=8 train.py</code></div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch diffusers accelerate wandb decord einops</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code># train.py — video DiT training script (sketch)
+import torch
+import torch.nn as nn
+import torch.distributed as dist
+from torch.distributed.fsdp import FullyShardedDataParallel as FSDP, MixedPrecision
+from diffusers import AutoencoderKLCogVideoX
+
+dist.init_process_group(backend="nccl")
+rank = dist.get_rank()
+torch.cuda.set_device(rank)
+
+# Frozen 3D VAE
+vae = AutoencoderKLCogVideoX.from_pretrained("THUDM/CogVideoX-2b", subfolder="vae").cuda().eval()
+
+class VideoDiT(nn.Module):
+    """Extend A13 DiT: Conv3d patch embed, 3D pos embed, full 3D attention."""
+    def __init__(self, depth=24, hidden=768, heads=12):
+        super().__init__()
+        # TODO: 3D patch embed (Conv3d, kernel=(1,2,2))
+        # TODO: 3D positional embedding (sin-cos along T, H, W)
+        # TODO: DiTBlock x depth (adaLN-Zero, full 3D attention)
+        # TODO: final unpatchify
+    def forward(self, x, t, txt):
+        raise NotImplementedError</code></pre></div>
+          <div class="cell"><span class="cn py">[2]</span><pre><code># Wrap with FSDP + bf16 mixed precision
+# model = FSDP(VideoDiT().cuda(),
+#              auto_wrap_policy=...,
+#              mixed_precision=MixedPrecision(param_dtype=torch.bfloat16))
+
+# Training loop: rectified flow on UCF-101 latents.
+# 16-frame 256x256 clips at 8fps -&gt; (4, 4, 64, 64) latent -&gt; ~4096 tokens with (1,2,2) patches.
+# 80-150k steps, effective batch 64-128, AdamW lr=1e-4, EMA 0.9999.
+# Save checkpoints every 5k. Eval every 5k. Budget: 8xH100 spot for 3-10 days.
+
+# After training: push to HF Hub
+# from huggingface_hub import HfApi
+# HfApi().upload_folder(repo_id="USERNAME/tiny-video-dit", folder_path="./ckpt")</code></pre></div>
+        </div>
         <ul class="checklist">
           <li><input type="checkbox" id="a18-done"><label for="a18-done">Assignment 18 deliverable pushed publicly + weights on HF Hub.</label></li>
         </ul>
@@ -1944,6 +3394,38 @@ tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
         </ol>
         <h4>Deliverable</h4>
         <p>Folder <code>phase-4/a19-custom-eval/</code> — but more importantly, a <strong>separate public repo</strong> for the eval framework itself (something like <code>video-hand-eval</code> or whatever you picked). Standalone, well-documented, easy to install. This is the kind of thing recruiters notice — useful tooling that helps the field.</p>
+        <div class="notebook">
+          <div class="nb-title">Eval framework starter (example: hand-anatomy)</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch torchvision mediapipe transformers decord</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import mediapipe as mp
+import numpy as np
+import cv2
+
+mp_hands = mp.solutions.hands.Hands(static_image_mode=True, max_num_hands=4)
+
+def hand_score(frame_rgb):
+    """Returns (hand_count, avg_confidence) for one frame."""
+    result = mp_hands.process(frame_rgb)
+    if not result.multi_hand_landmarks:
+        return dict(hands=0, conf=0.0)
+    confs = [c[0].score for c in result.multi_handedness]
+    return dict(hands=len(result.multi_hand_landmarks), conf=float(np.mean(confs)))
+
+def eval_video(frames_rgb):
+    return [hand_score(f) for f in frames_rgb]</code></pre></div>
+          <div class="cell"><span class="cn py">[2]</span><pre><code># Pipeline:
+# 1. Define a 50-prompt set probing your chosen failure mode (hands here).
+# 2. For each open model (HunyuanVideo, CogVideoX, Mochi, LTX, your A18), generate N samples.
+# 3. Score every frame; aggregate per-clip and per-model.
+# 4. Tabulate. Pick representative success/failure cases.
+# 5. Release as a standalone GitHub repo with installation + usage docs.
+
+# Other failure modes (pick one):
+# - Long-range identity drift (face embedding distance over time)
+# - Physics violations (optical flow sanity for dropping/colliding objects)
+# - Text-in-image legibility (OCR via PaddleOCR)
+# - Spatial reasoning ("A on top of B") via VLM-as-judge</code></pre></div>
+        </div>
         <ul class="checklist">
           <li><input type="checkbox" id="a19-done"><label for="a19-done">Assignment 19 deliverable + standalone eval repo public.</label></li>
         </ul>
@@ -1993,6 +3475,44 @@ tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
           <li>Explain Ulysses sequence parallelism in 90 seconds (concept 31).</li>
           <li>Name 3 VBench blind spots and how you'd build an eval for one (concept 32 + A19).</li>
         </ul>
+        <div class="notebook">
+          <div class="nb-title">Local terminal — open-source contribution workflow</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code># 1) Fork the target repo on GitHub, then clone YOUR fork
+git clone https://github.com/YOUR_USERNAME/diffusers
+cd diffusers
+
+# 2) Install in dev mode + pre-commit hooks
+pip install -e ".[dev]"
+pre-commit install
+
+# 3) New branch
+git checkout -b feat/short-description-of-your-change
+
+# 4) Make changes; run tests + lint
+pytest tests/path/to/relevant_test.py
+pre-commit run --all-files
+
+# 5) Push and open PR
+git push -u origin feat/short-description-of-your-change
+gh pr create --fill   # if gh CLI is set up, otherwise use GitHub web UI</code></pre></div>
+          <div class="cell"><span class="cn md">md</span><pre><code># PR description template
+
+## Summary
+- What does this PR add/change?
+- One sentence on *why* it's needed.
+
+## Implementation notes
+- Anything reviewers should know to evaluate the approach.
+
+## Test plan
+- [ ] New unit test added at `tests/...`
+- [ ] Existing tests still pass: `pytest tests/`
+- [ ] Lint clean: `pre-commit run --all-files`
+
+## Related
+- Closes #ISSUE_NUMBER (if applicable)
+- Related to discussion in #DISCUSSION_NUMBER</code></pre></div>
+        </div>
         <ul class="checklist">
           <li><input type="checkbox" id="a20-done"><label for="a20-done">Assignment 20 — PR merged in an open video codebase.</label></li>
           <li><input type="checkbox" id="phase4-final"><label for="phase4-final">Phase 4 final checkpoint passed.</label></li>
@@ -2025,6 +3545,24 @@ tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
           <li>"Closed-source" — fine, but read more skeptically when there's no code or replication possible.</li>
           <li>FID/VBench numbers without specifying the eval setup (which subset, which seed, what model checkpoint).</li>
         </ul>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — programmatic arXiv scan</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q arxiv</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import arxiv
+
+# Build your own daily-papers feed
+search = arxiv.Search(
+    query="video diffusion model",
+    max_results=5,
+    sort_by=arxiv.SortCriterion.SubmittedDate,
+)
+for r in search.results():
+    print(f"{r.published.date()}  {r.title[:65]}")
+    print(f"  authors: {', '.join(a.name for a in r.authors[:3])}...")
+    print(f"  abstract: {r.summary[:160].strip()}...")
+    print()
+# Apply the 20-min skim ladder: abstract -&gt; fig 1 -&gt; conclusion -&gt; method -&gt; ablations.</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: a paper claims SOTA but only shows samples and no quantitative comparison. Why might this be intentional rather than incompetent?</summary>
           <div class="answer">FID is gameable, VBench has known blind spots, and "good samples" is the actual product. A frontier lab might consciously decline to engage in metric-chasing because they think the metrics don't capture quality. This is legitimate — but it also makes the paper hard to compare. Read with appropriate skepticism: trust visual samples for raw capability, but discount the SOTA claim until someone replicates.</div>
@@ -2048,6 +3586,23 @@ tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
         </ul>
         <p><strong>Closed frontier</strong>: Sora (OpenAI), Veo 3 (Google), Runway Gen-3, Pika 2.0, Kling. You can read their tech reports/blog posts but not their code.</p>
         <p>Maintain a comparison table (A21) for: VAE architecture, DiT params, attention pattern, text encoders, training objective, training context length, inference latency. This table is your interview cheat sheet for "what's different about model X vs model Y."</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — build your model-comparison table</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q pandas</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import pandas as pd
+
+# A seed for A21. Add columns as you find them in papers / repos.
+models = pd.DataFrame([
+    dict(name="HunyuanVideo",  params_M=13_000, vae_ch=16, attn="full 3D MMDiT", text="CLIP+T5",   fps=24, license="Custom"),
+    dict(name="Wan 2.2",       params_M=14_000, vae_ch=16, attn="full 3D MoE",   text="UMT5",      fps=24, license="Apache"),
+    dict(name="CogVideoX-5B",  params_M= 5_000, vae_ch= 4, attn="full 3D MMDiT", text="T5",        fps= 8, license="Apache"),
+    dict(name="Mochi-1",       params_M=10_000, vae_ch=12, attn="asym 3D",       text="T5-XXL",    fps=30, license="Apache"),
+    dict(name="LTX-Video",     params_M= 2_000, vae_ch= 4, attn="windowed 3D",   text="T5",        fps=24, license="Custom"),
+])
+print(models.to_string(index=False))
+
+# Keep adding columns: training-context-len, inference-latency, strengths, weaknesses.</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: which model in this list would you pick as the <em>cleanest reference</em> for someone learning video diffusion, and why?</summary>
           <div class="answer">CogVideoX. Smaller, cleaner code, well-documented, used by many other research projects. HunyuanVideo is more production-grade but harder to read. Mochi-1 is high-quality but heavier. CogVideoX-2B fits in a Colab Pro session for inference and the architecture is approachable.</div>
@@ -2071,6 +3626,22 @@ tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
           <li><strong>Editing and inpainting</strong>: video equivalents of image inpainting. Stable but underexplored at scale.</li>
         </ul>
         <p><strong>How to pick your thread</strong>: which would you be excited to explain to a coworker at midnight? That's the thread where you'll do good work. Don't pick what's "hot"; pick what's interesting to you.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — decision matrix: pick your thread</div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>threads = {
+    "MoE for video":          dict(compute="high",      hireable="strong", originality="medium"),
+    "Real-time / streaming":  dict(compute="medium",    hireable="strong", originality="strong"),
+    "Camera / motion control":dict(compute="low (LoRA)",hireable="strong", originality="strong"),
+    "Distillation":           dict(compute="medium",    hireable="medium", originality="strong"),
+    "Robotics / world model": dict(compute="medium",    hireable="strong", originality="medium"),
+    "Long-form coherence":    dict(compute="high",      hireable="strong", originality="strong"),
+}
+
+print(f"{'thread':&lt;26} {'compute':&lt;12} {'hireable':&lt;10} {'originality'}")
+for t, p in threads.items():
+    print(f"{t:&lt;26} {p['compute']:&lt;12} {p['hireable']:&lt;10} {p['originality']}")
+# 'Camera / motion control' is your highest hit-rate Phase 7 capstone if compute is tight.</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: which thread above is most accessible without sponsored compute?</summary>
           <div class="answer">Controllability adapters. They're LoRA-scale finetunes ($500-3000 cloud spend) on existing open base models. You don't need to pretrain a video model from scratch — you take HunyuanVideo or Wan 2.2 as a base and add a control signal. This is also the most-productized area, so a clean adapter for camera or identity has direct industry interest.</div>
@@ -2091,6 +3662,32 @@ tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
         </ul>
         <p>Implementation challenges: <strong>load balancing</strong> (don't let one expert get all the tokens — auxiliary balancing loss), <strong>communication</strong> (token routing across GPUs is expensive — expert parallelism), and <strong>capacity sizing</strong> (when do you add more experts vs grow dense?).</p>
         <p>If you want to specialize: read the Mixtral paper (the LLM MoE that everyone copies), then read Wan 2.2's MoE specifics. The mechanics are identical; only what the experts specialize in differs.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — top-k MoE router</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class TopKRouter(nn.Module):
+    def __init__(self, d, n_experts, k=2):
+        super().__init__()
+        self.k = k
+        self.gate = nn.Linear(d, n_experts, bias=False)
+    def forward(self, x):
+        # x: (B, T, d)
+        logits = self.gate(x)                                      # (B, T, n_experts)
+        weights_raw, idx = logits.topk(self.k, dim=-1)
+        weights = F.softmax(weights_raw, dim=-1)                   # normalize top-k
+        return weights, idx
+
+router = TopKRouter(d=64, n_experts=8, k=2)
+x = torch.randn(2, 16, 64)
+w, idx = router(x)
+print("weights:", w.shape, " expert indices:", idx.shape)
+print("expert load distribution:", torch.bincount(idx.flatten(), minlength=8).tolist())
+# Compute = k/n_experts of dense.  Capacity = full n_experts of param storage.</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: an 8-expert MoE with 2 active experts per token has roughly the same compute as a dense model with 2/8 = 25% of the total params. So why does MoE help?</summary>
           <div class="answer">Compute and capacity are decoupled. The model has 100% of the params available (all experts can hold knowledge), but only 25% are touched per token. Different tokens activate different experts, so the effective capacity utilized across a batch is much higher than 25%. Empirically: MoE matches a dense model with 3-5× the active params, at the cost of more memory (you need to hold all experts) and more communication.</div>
@@ -2113,6 +3710,27 @@ tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
         </ul>
         <p>The tradeoff is always the same: speed up at the cost of <strong>diversity</strong>. A 1-step model often produces near-deterministic outputs for a given prompt — great for prototyping, less great for creative exploration.</p>
         <p>For video, the story is similar but harder — temporal consistency makes distillation more brittle. Hyper-SD and DMD have video variants in research as of 2025; you'll likely build on these for any real-time video portfolio piece.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — distillation strategy comparison</div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>strategies = {
+    "Consistency Models (LCM)":
+        dict(impl_complexity="medium",   stability="finicky", base_compat="diffusion",
+             quality_at_4_step="strong",  notes="Original; instability inspired follow-ups."),
+    "DMD2":
+        dict(impl_complexity="high",     stability="good",    base_compat="diffusion / flow",
+             quality_at_4_step="best",    notes="Two networks; teacher + score-aligned student."),
+    "Rectified Flow Reflow":
+        dict(impl_complexity="low",      stability="strong",  base_compat="flow matching only",
+             quality_at_4_step="strong",  notes="Just retrain on (sample, noise) pairs from teacher."),
+    "Hyper-SD":
+        dict(impl_complexity="medium",   stability="good",    base_compat="diffusion",
+             quality_at_4_step="strong",  notes="Segmented training across t ranges."),
+}
+for name, props in strategies.items():
+    print(f"\n{name}")
+    for k, v in props.items():
+        print(f"  {k:&lt;20s} {v}")</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: a friend has a working 50-step SD3 model and wants 4-step inference. They consider Consistency Models, DMD, and Rectified Flow Reflow. Which is the safest starting point and why?</summary>
           <div class="answer">For a flow-matching model like SD3, Rectified Flow Reflow is the most natural fit — same training paradigm, no new losses to balance. Consistency distillation works but has known instability. DMD is the strongest result currently but the most complex to implement. Recommend reflow first, then escalate to DMD if quality isn't good enough.</div>
@@ -2138,6 +3756,26 @@ tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
           <li>Determinism / reproducibility — for agent training, the same (state, action) should produce a reproducible outcome.</li>
         </ul>
         <p>If you're more excited about robots/agents than art, this is a real adjacent path. Same diffusion skills, different application domain. Worth knowing about even if not your primary focus.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — action-conditioned video (sketch)</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import torch.nn as nn
+
+# Same video DiT as Phase 4 — but condition on ACTIONS, not text.
+B, T = 1, 16
+state  = torch.randn(B, 4, T, 32, 32)            # latent video tokens
+action = torch.randn(B, T, 8)                    # 8-dim continuous control per frame
+
+# Action embedding plugs into the conditioning stream alongside time
+action_proj = nn.Linear(8, 384)
+action_emb  = action_proj(action)                # (B, T, d_model)
+print("action embedding:", action_emb.shape)
+
+# For robotics: train on real-world videos where (action, next_state) is recorded.
+# Art-trained models will hallucinate physics that's visually plausible but wrong.
+print("Reminder: data choice is what makes a world model vs an art model.")</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: a video model for robotics needs strong physics; a video model for art doesn't. Why does this matter for the training data choice?</summary>
           <div class="answer">For robotics, you want training data where physics is preserved — real-world recordings, ideally with paired (action, state) labels. Cartoon physics, edited footage, and clips with cuts are <em>poison</em>. For art, the data can be more diverse and edited. The same architecture trained on different data produces models with different strengths — and a model trained on art will be terrible at robotics, even if its samples look impressive.</div>
@@ -2166,6 +3804,34 @@ tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
         </ol>
         <h4>Deliverable</h4>
         <p>The markdown file in your repo. Optional: post it as a HuggingFace blog post — these comparison tables are highly shared and good distribution.</p>
+        <div class="notebook">
+          <div class="nb-title">Starter — programmatic comparison table</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q pandas tabulate</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import pandas as pd
+from datetime import date
+
+models = pd.DataFrame([
+    dict(name="HunyuanVideo",  params_M=13_000, vae_ch=16, attn="full 3D MMDiT", text_enc="CLIP-L+T5-XXL",
+         fps=24, max_ctx=129,  license="Custom", strengths="quality",       weaknesses="VRAM"),
+    dict(name="Wan 2.2",       params_M=14_000, vae_ch=16, attn="full 3D MoE",   text_enc="UMT5",
+         fps=24, max_ctx=121,  license="Apache", strengths="MoE efficient", weaknesses="newer; less comm"),
+    dict(name="CogVideoX-5B",  params_M= 5_000, vae_ch= 4, attn="full 3D MMDiT", text_enc="T5",
+         fps= 8, max_ctx=49,   license="Apache", strengths="clean code",     weaknesses="dated quality"),
+    dict(name="Mochi-1",       params_M=10_000, vae_ch=12, attn="asym 3D",      text_enc="T5-XXL",
+         fps=30, max_ctx=163,  license="Apache", strengths="quality",        weaknesses="size"),
+    dict(name="LTX-Video",     params_M= 2_000, vae_ch= 4, attn="windowed 3D",  text_enc="T5",
+         fps=24, max_ctx=257,  license="Custom", strengths="speed",          weaknesses="quality"),
+    # TODO: add your A18 model row
+])
+
+with open("phase-5/a21-comparison.md", "w") as f:
+    f.write(f"# Open Video Model Comparison\n\nLast updated: {date.today()}\n\n")
+    f.write(models.to_markdown(index=False))
+print(models.to_string(index=False))</code></pre></div>
+          <div class="cell"><span class="cn py">[2]</span><pre><code># Update weekly. Add columns as you discover them:
+# - training_context_len, inference_latency_h100, vbench_overall, license_details.
+# Consider posting as a HuggingFace blog post — comparison tables get widely shared.</code></pre></div>
+        </div>
         <ul class="checklist">
           <li><input type="checkbox" id="a21-done"><label for="a21-done">Assignment 21 — initial comparison doc published; maintain weekly.</label></li>
         </ul>
@@ -2189,6 +3855,42 @@ tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
         </ol>
         <h4>Deliverable</h4>
         <p>The notes file in your repo. The "best of 5" is a great seed for your A23 position paper.</p>
+        <div class="notebook">
+          <div class="nb-title">Starter — daily paper script + log template</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q arxiv</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import arxiv
+from datetime import date
+
+def daily_candidates(n=5):
+    """Pull most recent video-gen papers — your morning feed."""
+    search = arxiv.Search(
+        query="video diffusion OR video generation",
+        max_results=n,
+        sort_by=arxiv.SortCriterion.SubmittedDate,
+    )
+    return list(search.results())
+
+picks = daily_candidates(5)
+for r in picks:
+    print(f"{r.published.date()}  {r.title[:70]}")
+    print(f"  {r.entry_id}")
+    print()</code></pre></div>
+          <div class="cell"><span class="cn md">md</span><pre><code># Daily log template — append to phase-5/a22-papers.md
+
+## YYYY-MM-DD — Paper Title
+
+**Link:** https://arxiv.org/abs/XXXX.XXXXX  **Tag:** [thread]  **Author:** X et al.
+
+### 3-sentence summary
+1. What problem they're solving.
+2. The key technique.
+3. Headline result.
+
+### What stuck with me
+[1-2 sentences. Often a clever ablation or a surprising negative result.]
+
+---</code></pre></div>
+        </div>
         <ul class="checklist">
           <li><input type="checkbox" id="a22-done"><label for="a22-done">Assignment 22 — 28 papers logged with summaries + best-of-5.</label></li>
         </ul>
@@ -2222,6 +3924,49 @@ tokenizer = CLIPTokenizer.from_pretrained("openai/clip-vit-large-patch14")
         </ol>
         <h4>Deliverable</h4>
         <p>The published blog post, link in your repo. Phase 5 doesn't have a "final checkpoint" — the position paper <em>is</em> the checkpoint.</p>
+        <div class="notebook">
+          <div class="nb-title">Starter — outline first, then write</div>
+          <div class="cell"><span class="cn md">md</span><pre><code># The State of Video Generation in [Month Year]
+
+## Intro
+Where we are right now, in one paragraph. What's the moment?
+
+## What's Solved (2026 capabilities)
+- 5-10 second photorealistic clips from text
+- First-frame image-to-video conditioning
+- In-domain style consistency
+- (Add evidence and concrete examples for each)
+
+## What's Broken
+- Long-range identity (cite your A19 findings if applicable)
+- Hand and face anatomy at small scale
+- Physics violations in unconstrained motion
+- 1-minute+ narrative coherence
+- (For each: cite a paper or your own observation)
+
+## Where It's Going — 3-5 threads to watch
+- MoE for video (Wan 2.2 evidence + extrapolation)
+- Real-time / streaming generation (LTX, Decart trajectory)
+- Joint audio-video (Veo 3, Movie Gen Audio)
+- Video as world model (Wayve, World Labs, Genie 2)
+- Distillation toward 1-step (DMD2, Hyper-SD)
+
+## Predictions (make these falsifiable)
+- By [date], [specific claim that could be proven wrong].
+
+## Recommendations for Newcomers
+What you wish someone had told you 12 months ago.
+
+## Cited Reading
+Link to your A22 best-of-5 plus 5-10 anchor papers.</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code># Workflow
+# 1. Outline first (above). Don't write before you have all section headers.
+# 2. Draft each section. Cite specific papers, not "the literature".
+# 3. Cut everything you can't defend.
+# 4. Beta readers — Twitter mutuals + Claude in Tutor mode.
+# 5. Publish: HuggingFace blog (best discoverability), Substack, or personal site.
+# 6. Cross-post: Twitter thread + LinkedIn. Include in your repo README.</code></pre></div>
+        </div>
         <ul class="checklist">
           <li><input type="checkbox" id="a23-done"><label for="a23-done">Assignment 23 — position paper published and shared.</label></li>
         </ul>
@@ -2249,6 +3994,35 @@ model = FSDP(model, auto_wrap_policy=wrap_policy, mixed_precision=...)</code></p
         <p><strong>FSDP1 vs FSDP2</strong>: FSDP2 (PyTorch 2.4+) has better composability (with tensor parallelism, with <code>torch.compile</code>) and simpler internals. Use FSDP2 for new code.</p>
         <p><strong>Wrap policy matters</strong>: wrap by transformer block, not by every Linear layer. Wrapping too granularly means too many all-gathers and kills throughput.</p>
         <p><strong>Activation checkpointing</strong>: forward saves only a few "checkpoint" activations; intermediate activations are recomputed during backward. Trades compute (~30% more) for big memory savings. Essential for training big video models.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — FSDP wrap policy (single-GPU smoke test)</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch
+# A full FSDP run needs torchrun + multi-GPU. Single-GPU runs this as a stub.</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import torch.nn as nn
+
+class TransformerBlock(nn.Module):
+    def __init__(self, d):
+        super().__init__()
+        self.norm = nn.LayerNorm(d)
+        self.attn = nn.MultiheadAttention(d, 8, batch_first=True)
+        self.mlp  = nn.Sequential(nn.Linear(d, 4 * d), nn.GELU(), nn.Linear(4 * d, d))
+    def forward(self, x):
+        h = self.norm(x)
+        return x + self.mlp(self.attn(h, h, h, need_weights=False)[0])
+
+model = nn.Sequential(*[TransformerBlock(512) for _ in range(12)])
+print("total params:", sum(p.numel() for p in model.parameters()))
+
+# Wrap by transformer block — the right granularity for FSDP/FSDP2.
+# import functools
+# from torch.distributed.fsdp import FullyShardedDataParallel as FSDP
+# from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
+# policy = functools.partial(transformer_auto_wrap_policy,
+#                            transformer_layer_cls={TransformerBlock})
+# model = FSDP(model, auto_wrap_policy=policy,
+#              mixed_precision=MixedPrecision(param_dtype=torch.bfloat16))</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: when you switch from DDP to FSDP on the same model + same effective batch size, throughput drops 20%. Is this expected?</summary>
           <div class="answer">Yes. FSDP adds all-gather + reduce-scatter communication that DDP doesn't have (DDP only does all-reduce on grads). The benefit is that FSDP <em>fits</em> models DDP can't. Throughput cost is the price you pay for scale. To minimize it: wrap at the right granularity, use bf16 communication, overlap communication with compute (FSDP2's default).</div>
@@ -2273,6 +4047,36 @@ model = FSDP(model, auto_wrap_policy=wrap_policy, mixed_precision=...)</code></p
           <li>8+ GPUs and 32-128k tokens: Ulysses.</li>
           <li>16+ GPUs and 128k+ tokens: hybrid Ulysses + Ring.</li>
         </ul>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — online softmax (the Ring/Flash trick)</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+
+def online_softmax_step(Q, K_chunk, V_chunk, prev):
+    """Incrementally fold a (K, V) chunk into a running attention output.
+       prev: dict with 'max', 'sum', 'out' or None on first call.
+       This is the math FlashAttention and Ring Attention share."""
+    d = Q.shape[-1]
+    scores = Q @ K_chunk.transpose(-2, -1) / (d ** 0.5)         # (T_q, T_k)
+    m = scores.max(dim=-1, keepdim=True).values
+    if prev is None:
+        prev = {"max": m, "sum": torch.zeros_like(m), "out": torch.zeros(Q.shape[0], V_chunk.shape[-1])}
+    m_new = torch.maximum(prev["max"], m)
+    p     = torch.exp(scores - m_new)
+    out   = prev["out"] * torch.exp(prev["max"] - m_new) + p @ V_chunk
+    s_sum = prev["sum"] * torch.exp(prev["max"] - m_new) + p.sum(dim=-1, keepdim=True)
+    return {"max": m_new, "sum": s_sum, "out": out}
+
+# Demo: stream the attention over 4 chunks of K/V (Ring Attention does this across GPUs)
+T_q, T_kv, d = 8, 32, 16
+Q = torch.randn(T_q, d)
+state = None
+for chunk in torch.randn(4, 2, T_kv // 4, d).split(1, dim=0):
+    K, V = chunk.squeeze(0)
+    state = online_softmax_step(Q, K, V, state)
+attn_out = state["out"] / state["sum"]
+print("ring-style attention output:", attn_out.shape)</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: why does Ulysses scale with the number of attention heads but Ring Attention doesn't?</summary>
           <div class="answer">Ulysses shards the head dimension — the all-to-all redistributes tokens such that each GPU gets a complete sequence but only some heads. With H heads, you can split across up to H GPUs this way. Ring Attention shards the <em>sequence</em> dim and rotates K/V chunks around a ring; the math doesn't depend on head count, so you can scale to arbitrary GPU count (constant memory per GPU). Combine them when both axes are large.</div>
@@ -2293,6 +4097,35 @@ model = FSDP(model, auto_wrap_policy=wrap_policy, mixed_precision=...)</code></p
           <li><strong>Sparse / windowed attention</strong>: at inference, you can sometimes truncate attention to local windows without quality loss — especially for high-res images/video where attention naturally falls off.</li>
           <li><strong>KV cache (autoregressive video)</strong>: for any model that generates frames autoregressively, cache K and V from previous frames. Same trick as LLM serving.</li>
         </ul>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — bf16 + torch.compile</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import torch.nn as nn
+import time
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+m = nn.Sequential(nn.Linear(2048, 8192), nn.GELU(), nn.Linear(8192, 2048)).to(device)
+
+# bf16 cast — same shape, half the memory, faster on GPU
+if device == "cuda":
+    m = m.to(dtype=torch.bfloat16)
+
+x = torch.randn(8, 2048, device=device,
+                dtype=torch.bfloat16 if device == "cuda" else torch.float32)
+
+def bench(fn, label):
+    for _ in range(3): fn(x)                                # warmup
+    if device == "cuda": torch.cuda.synchronize()
+    t0 = time.time()
+    for _ in range(20): y = fn(x)
+    if device == "cuda": torch.cuda.synchronize()
+    print(f"{label:&lt;14s}  {(time.time()-t0)*1000/20:.2f} ms/iter")
+
+bench(m, "eager")
+m_compiled = torch.compile(m)
+bench(m_compiled, "torch.compile")</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: <code>torch.compile</code> sometimes <em>slows down</em> inference instead of speeding it up. Why?</summary>
           <div class="answer">Graph breaks. Any Python control flow that <code>torch.compile</code> can't trace forces a graph break — the model is split into multiple compiled regions, with overhead between them. Common culprits: dynamic shapes (batch size varies), Python conditionals on tensor values, custom Python ops without torch wrappers. Diagnose with <code>TORCH_LOGS=guards,recompiles</code> or <code>torch._dynamo.explain</code>. The fix is to make shapes static and remove Python branching from the hot path.</div>
@@ -2320,6 +4153,38 @@ model = FSDP(model, auto_wrap_policy=wrap_policy, mixed_precision=...)</code></p
         </ol>
         <p>Cost is much lower than training from scratch — typically 5-20% of teacher's training compute. Yields 4-step models that match 25-step teachers.</p>
         <p>For Phase 6, distill your own A15 or A18 model. The result is a useful real-time demo and a portfolio piece showing you understand the speedup gap.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — consistency-distillation loss skeleton</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import torch.nn as nn
+import torch.nn.functional as F
+
+class Student(nn.Module):
+    def __init__(self, d=8):
+        super().__init__()
+        self.net = nn.Sequential(nn.Linear(d + 1, 64), nn.GELU(), nn.Linear(64, d))
+    def forward(self, x, t):
+        return self.net(torch.cat([x, t.expand(x.shape[0], 1)], dim=1))
+
+student = Student()
+opt = torch.optim.Adam(student.parameters(), lr=1e-3)
+
+# Sample x_0, then x_t1 and x_t2 (one teacher step apart).
+x0  = torch.randn(16, 8)
+t1, t2 = torch.tensor([0.6]), torch.tensor([0.5])
+eps = torch.randn_like(x0)
+x_t1 = x0 + t1 * eps                                      # placeholder forward
+x_t2 = x_t1 - 0.05 * eps                                  # placeholder teacher step
+
+pred_a = student(x_t1, t1)
+with torch.no_grad():
+    pred_b = student(x_t2, t2)                             # stop-grad on target
+loss = F.mse_loss(pred_a, pred_b)
+loss.backward(); opt.step()
+print("consistency loss:", loss.item())
+# Result of distillation: 4-step student matches 25-50-step teacher quality.</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: why do you <code>stop_grad</code> on one of the student's predictions in the consistency loss?</summary>
           <div class="answer">If both predictions had gradient, the network could trivially make them equal by collapsing to a constant (every input maps to the same x̂_0). The stop-grad makes one side a "target" that the other side must match — but the target is not optimized toward the prediction. This is the same pattern as target networks in RL.</div>
@@ -2350,6 +4215,27 @@ model = FSDP(model, auto_wrap_policy=wrap_policy, mixed_precision=...)</code></p
           <li><strong>Orchestration</strong>: Ray, Slurm, or a custom S3-pull worker pool for throughput.</li>
         </ul>
         <p>The hard part isn't any one stage — it's <strong>throughput</strong> and <strong>monitoring</strong>. A pipeline processing 10M clips needs reliable error handling, progress dashboards, and idempotent retries. Your microservices background applies directly.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — perceptual-hash dedup (one pipeline stage)</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q imagehash pillow</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>from PIL import Image
+import imagehash
+
+# Three "clip thumbnails" — two near-duplicates, one different.
+imgs = [
+    Image.new("RGB", (64, 64), (255, 0,   0)),       # red
+    Image.new("RGB", (64, 64), (254, 1,   0)),       # near-dup red
+    Image.new("RGB", (64, 64), (  0, 255, 0)),       # green
+]
+
+hashes = [imagehash.phash(im) for im in imgs]
+for i, h in enumerate(hashes):
+    print(f"clip {i}: pHash = {h}")
+print("dist 0-1 (near-dup):", hashes[0] - hashes[1])   # ~0
+print("dist 0-2 (different):", hashes[0] - hashes[2])  # &gt;0
+
+# Real pipeline: hash N representative frames per clip; bucket by hash; dedup within buckets.</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: why caption clips with both a short (10-word) and a long (100-word) caption?</summary>
           <div class="answer">Models like SD3 use multiple text encoders (CLIP-L, CLIP-G, T5-XXL) and benefit from captions matched to each encoder's sweet spot. Short captions work better with CLIP-style encoders (which were trained on short alt-text). Long captions exercise T5's compositional parsing. Training the diffusion model on both expands the input distribution it learns to follow — a user prompt of any length is then closer to something the model has seen.</div>
@@ -2369,6 +4255,32 @@ model = FSDP(model, auto_wrap_policy=wrap_policy, mixed_precision=...)</code></p
           <li><strong>Understand operator fusion</strong>: fusing GELU + Linear + bias eliminates two memory round-trips. <code>torch.compile</code> does this for free; advanced users write fused kernels in Triton.</li>
         </ul>
         <p>If you find yourself enjoying this, go deeper. Most engineers don't need to. <strong>Knowing when you'd need a custom kernel</strong> is more important than being able to write one — that lets you collaborate productively with the GPU team that does.</p>
+        <div class="notebook">
+          <div class="nb-title">Try it in Colab — profile first, kernel later</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import torch
+import time
+
+device = "cuda" if torch.cuda.is_available() else "cpu"
+x = torch.randn(2048, 2048, device=device)
+
+def run(fn, label, iters=10):
+    for _ in range(3): fn()                       # warmup
+    if device == "cuda": torch.cuda.synchronize()
+    t0 = time.time()
+    for _ in range(iters): _ = fn()
+    if device == "cuda": torch.cuda.synchronize()
+    print(f"{label:&lt;18s}  {(time.time() - t0) * 1000 / iters:.2f} ms")
+
+run(lambda: torch.relu(x @ x.T),               "eager")
+fused = torch.compile(lambda: torch.relu(x @ x.T))
+run(fused,                                     "torch.compile")
+
+# Decision flow before writing a Triton kernel:
+# 1) Is this op the bottleneck? (profile shows &gt;30% of total time)
+# 2) Did torch.compile + bf16 already get me there?
+# Only if YES to #1 and NO to #2 should you write a custom kernel.</code></pre></div>
+        </div>
         <details class="quiz">
           <summary>Self-check: a researcher asks if you can speed up their model with a custom Triton kernel. Two questions you'd ask before saying yes.</summary>
           <div class="answer">(1) "Is this op the bottleneck?" — profile first. A 2× speedup on something taking 5% of total time is 2.5% improvement. (2) "Have you tried torch.compile + bf16?" — most "I need a kernel" wishes turn out to be solved by compile + bf16 + a sensible batch size. Only when those are exhausted does a custom kernel pay off.</div>
@@ -2399,6 +4311,46 @@ model = FSDP(model, auto_wrap_policy=wrap_policy, mixed_precision=...)</code></p
         </ol>
         <h4>Deliverable</h4>
         <p>Folder <code>phase-6/a24-fsdp/</code>: script, throughput table, profiler screenshot, writeup. This is a strong interview talking point — "I scaled a 350M-param video DiT to 4 GPUs with FSDP and characterized the overhead."</p>
+        <div class="notebook">
+          <div class="nb-title">Starter — train_fsdp.py (run with torchrun)</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch wandb
+# Launch with:  torchrun --nproc-per-node=4 train_fsdp.py</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code># train_fsdp.py
+import functools
+import torch
+import torch.distributed as dist
+from torch.distributed.fsdp import (
+    FullyShardedDataParallel as FSDP,
+    MixedPrecision,
+    ShardingStrategy,
+)
+from torch.distributed.fsdp.wrap import transformer_auto_wrap_policy
+
+dist.init_process_group(backend="nccl")
+rank = dist.get_rank()
+torch.cuda.set_device(rank)
+
+# from your_model import DiT, DiTBlock     # the A13 or A15 model
+# model = DiT(...).cuda()
+
+# Wrap by transformer block (the right granularity)
+# policy = functools.partial(transformer_auto_wrap_policy,
+#                            transformer_layer_cls={DiTBlock})
+# mp = MixedPrecision(param_dtype=torch.bfloat16,
+#                     reduce_dtype=torch.float32,
+#                     buffer_dtype=torch.bfloat16)
+# model = FSDP(model, auto_wrap_policy=policy,
+#              mixed_precision=mp,
+#              sharding_strategy=ShardingStrategy.FULL_SHARD)
+
+# Activation checkpointing for memory savings:
+# from torch.distributed.algorithms._checkpoint.checkpoint_wrapper import checkpoint_wrapper
+# model = checkpoint_wrapper(model)</code></pre></div>
+          <div class="cell"><span class="cn py">[2]</span><pre><code># Profile: nvidia-smi dmon during training. Target &gt;90% GPU util.
+# Measure tokens/sec at 1, 2, 4 GPUs to compute scaling efficiency.
+# Report: (a) throughput vs GPU count, (b) memory savings from activation checkpointing,
+#         (c) where comms is the bottleneck.</code></pre></div>
+        </div>
         <ul class="checklist">
           <li><input type="checkbox" id="a24-done"><label for="a24-done">Assignment 24 deliverable pushed.</label></li>
         </ul>
@@ -2423,6 +4375,48 @@ model = FSDP(model, auto_wrap_policy=wrap_policy, mixed_precision=...)</code></p
         </ol>
         <h4>Deliverable</h4>
         <p>Folder <code>phase-6/a25-distillation/</code> with distilled weights, comparison grid, blog-style writeup. Publish a HuggingFace Space with the 4-step model for an interactive demo.</p>
+        <div class="notebook">
+          <div class="nb-title">Starter — consistency distillation on your A15/A18 model</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch diffusers gradio huggingface_hub</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import copy
+import torch
+import torch.nn.functional as F
+
+# Load A15 (or A18) checkpoint into both teacher and student
+# from your_model import DiT
+# teacher = DiT(...).cuda().eval()
+# teacher.load_state_dict(torch.load("a15_ema.pt"))
+# for p in teacher.parameters(): p.requires_grad = False
+# student = copy.deepcopy(teacher); student.train()
+# opt = torch.optim.Adam(student.parameters(), lr=5e-5)
+
+def consistency_step(student, teacher, x0, txt, opt, dt=0.05):
+    B = x0.shape[0]
+    t1 = torch.rand(B, device=x0.device) * 0.9 + 0.1   # (0.1, 1.0]
+    t2 = (t1 - dt).clamp(min=0.0)
+    x1 = torch.randn_like(x0)
+    # Forward (flow-matching x_t)
+    x_t1 = (1 - t1.view(-1,1,1,1)) * x0 + t1.view(-1,1,1,1) * x1
+    # One teacher Euler step
+    with torch.no_grad():
+        v_t = teacher(x_t1, t1, txt)
+        x_t2 = x_t1 - dt * v_t
+
+    pred_a = student(x_t1, t1, txt)
+    with torch.no_grad():
+        pred_b = student(x_t2, t2, txt)
+    loss = F.mse_loss(pred_a, pred_b)
+    opt.zero_grad(); loss.backward(); opt.step()
+    return loss.item()</code></pre></div>
+          <div class="cell"><span class="cn py">[2]</span><pre><code># 10-20k distillation steps. Sample at 1, 2, 4, 8 steps vs teacher at 25-50.
+# Compute FID per setting. Side-by-side 4-step student vs 25-step teacher grid.
+
+# Deploy as a HuggingFace Space (real-time gen demo):
+# import gradio as gr
+# def generate(prompt, steps=4):
+#     return student.sample_with_prompt(prompt, steps=steps)
+# gr.Interface(generate, "text", "image").launch()</code></pre></div>
+        </div>
         <ul class="checklist">
           <li><input type="checkbox" id="a25-done"><label for="a25-done">Assignment 25 deliverable pushed + demo Space live.</label></li>
         </ul>
@@ -2459,6 +4453,57 @@ model = FSDP(model, auto_wrap_policy=wrap_policy, mixed_precision=...)</code></p
         </ol>
         <h4>Deliverable</h4>
         <p>Standalone GitHub repo (e.g., <code>video-data-pipeline</code>), funnel chart, sample output, blog post on what you learned. Phase 6 doesn't require all three assignments — pick the ones that match your target labs.</p>
+        <div class="notebook">
+          <div class="nb-title">Starter — end-to-end pipeline scaffold</div>
+          <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q scenedetect opencv-python-headless imagehash transformers torch webdataset</code></pre></div>
+          <div class="cell"><span class="cn py">[1]</span><pre><code>import cv2
+import imagehash
+import numpy as np
+from PIL import Image
+from pathlib import Path
+from scenedetect import detect, ContentDetector, split_video_ffmpeg
+
+INPUT_DIR  = Path("raw")
+OUTPUT_DIR = Path("processed")
+OUTPUT_DIR.mkdir(exist_ok=True)
+
+def scene_split(video_path):
+    scenes = detect(str(video_path), ContentDetector(threshold=27.0))
+    out_template = f"{OUTPUT_DIR}/$VIDEO_NAME_Scene-$SCENE_NUMBER.mp4"
+    split_video_ffmpeg(str(video_path), scenes, output_file_template=out_template)
+    return len(scenes)
+
+def motion_score(clip_path, max_frames=8):
+    cap = cv2.VideoCapture(str(clip_path))
+    grays = []
+    for _ in range(max_frames):
+        ok, f = cap.read()
+        if not ok: break
+        grays.append(cv2.cvtColor(f, cv2.COLOR_BGR2GRAY))
+    cap.release()
+    if len(grays) &lt; 2: return 0.0
+    flows = [cv2.calcOpticalFlowFarneback(grays[i], grays[i+1], None,
+                                          0.5, 3, 15, 3, 5, 1.2, 0) for i in range(len(grays)-1)]
+    return float(np.mean([np.linalg.norm(f, axis=-1).mean() for f in flows]))
+
+def phash_clip(clip_path):
+    cap = cv2.VideoCapture(str(clip_path)); ok, f = cap.read(); cap.release()
+    return str(imagehash.phash(Image.fromarray(cv2.cvtColor(f, cv2.COLOR_BGR2RGB))))</code></pre></div>
+          <div class="cell"><span class="cn py">[2]</span><pre><code># Funnel: raw -&gt; scene_split -&gt; duration filter -&gt; aesthetic -&gt; motion -&gt; dedup -&gt; caption -&gt; shard
+# Track retention at each stage. Plot funnel as a bar chart.
+
+# Captioning (LLaVA-NeXT-Video or Qwen2.5-VL):
+# from transformers import AutoModelForVision2Seq, AutoProcessor
+# processor = AutoProcessor.from_pretrained("llava-hf/LLaVA-NeXT-Video-7B-hf")
+# model = AutoModelForVision2Seq.from_pretrained("llava-hf/LLaVA-NeXT-Video-7B-hf").cuda()
+# caption each clip with both a short (10-word) and a long (100-word) variant
+
+# Store as WebDataset shards (~256MB each)
+# import webdataset as wds
+# sink = wds.ShardWriter("shards/data-%06d.tar", maxsize=256_000_000)
+# for clip_id, mp4_bytes, caption in items:
+#     sink.write({"__key__": clip_id, "mp4": mp4_bytes, "txt": caption})</code></pre></div>
+        </div>
         <ul class="checklist">
           <li><input type="checkbox" id="a26-done"><label for="a26-done">Assignment 26 deliverable + standalone repo public.</label></li>
         </ul>
