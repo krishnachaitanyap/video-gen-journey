@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Autograd — Interactive Tutorial</title>
+<style>
+  :root {
+    --bg: #0f1115;
+    --panel: #161a22;
+    --panel-2: #1c2230;
+    --border: #2a3142;
+    --text: #e6e9ef;
+    --muted: #9aa3b2;
+    --accent: #7aa2ff;
+    --accent-2: #66d3a8;
+    --warn: #ffb86b;
+    --danger: #ff6b6b;
+    --code-bg: #0b0d12;
+    --node-leaf: #66d3a8;
+    --node-op: #7aa2ff;
+    --node-output: #ffb86b;
+    --node-pending: #3a4256;
+    --node-active: #ffb86b;
+    --node-done: #66d3a8;
+    --grad-fill: #ff6b6b;
+    --edge: #4a5675;
+    --edge-active: #ffb86b;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.55; -webkit-font-smoothing: antialiased; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    background: var(--code-bg); padding: 1px 6px; border-radius: 4px; font-size: 0.9em; color: #d6e0ff; }
+  pre { background: var(--code-bg); padding: 14px 16px; border-radius: 8px; border: 1px solid var(--border);
+    overflow-x: auto; font-size: 0.85em; margin: 0; }
+  pre code { background: transparent; padding: 0; }
+  h1, h2, h3, h4 { line-height: 1.25; }
+  h1 { font-size: 1.8rem; margin: 0 0 8px; }
+  h2 { font-size: 1.35rem; margin-top: 36px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+  h3 { font-size: 1.05rem; margin-top: 22px; }
+  p { color: var(--text); }
+  .muted { color: var(--muted); }
+  /* Layout */
+  .app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+  .sidebar { background: var(--panel); border-right: 1px solid var(--border); padding: 20px 16px;
+    position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+  .sidebar h1 { font-size: 0.95rem; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.1em; margin-bottom: 14px; }
+  .sidebar nav a { display: block; padding: 6px 10px; border-radius: 6px; color: var(--text);
+    font-size: 0.92rem; margin-bottom: 2px; }
+  .sidebar nav a:hover { background: var(--panel-2); text-decoration: none; }
+  .sidebar nav a.section { color: var(--muted); font-size: 0.74rem; text-transform: uppercase;
+    letter-spacing: 0.08em; margin-top: 16px; padding: 4px 10px; }
+  .sidebar nav a.back { color: var(--accent); margin-bottom: 16px; padding-left: 0; font-size: 0.85rem; }
+  main { padding: 32px 48px 80px; max-width: 1100px; }
+  .card { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 18px 20px; margin: 14px 0; }
+  /* Visualizer */
+  .viz-wrap { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; align-items: stretch; }
+  @media (max-width: 1000px) { .viz-wrap { grid-template-columns: 1fr; } }
+  .viz-panel { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 14px 16px; }
+  .viz-panel h4 { margin: 0 0 10px; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.08em; font-size: 0.78rem; }
+  .controls { display: flex; gap: 8px; margin: 12px 0; flex-wrap: wrap; align-items: center; }
+  .controls select, .controls button {
+    background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+    padding: 6px 12px; border-radius: 6px; font-size: 0.88rem; cursor: pointer;
+    font-family: inherit;
+  }
+  .controls button:hover:not(:disabled) { background: var(--bg); border-color: var(--accent); }
+  .controls button:disabled { opacity: 0.45; cursor: not-allowed; }
+  .controls button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 600; }
+  .controls button.primary:hover:not(:disabled) { background: var(--accent-2); border-color: var(--accent-2); }
+  .controls .spacer { flex: 1; }
+  .controls .step-info { color: var(--muted); font-size: 0.82rem; font-family: ui-monospace, monospace; }
+  .graph-svg { width: 100%; height: 380px; background: var(--code-bg); border-radius: 8px;
+    border: 1px solid var(--border); display: block; }
+  .state-table { width: 100%; border-collapse: collapse; font-size: 0.86rem;
+    font-family: ui-monospace, SFMono-Regular, monospace; }
+  .state-table th, .state-table td { padding: 6px 10px; text-align: right; border-bottom: 1px solid var(--border); }
+  .state-table th { color: var(--muted); font-weight: 500; text-align: right; text-transform: uppercase;
+    font-size: 0.72rem; letter-spacing: 0.06em; }
+  .state-table th:first-child, .state-table td:first-child { text-align: left; }
+  .state-table tr.leaf td { color: var(--node-leaf); }
+  .state-table tr.output td { color: var(--node-output); }
+  .state-table .grad-cell { color: var(--grad-fill); }
+  .state-table .zero-grad { color: var(--muted); }
+  .legend { display: flex; gap: 14px; font-size: 0.74rem; color: var(--muted); margin-top: 8px;
+    flex-wrap: wrap; }
+  .legend .dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 5px;
+    vertical-align: middle; }
+  .stage-pill { display: inline-block; padding: 2px 10px; border-radius: 999px; font-size: 0.74rem;
+    background: var(--panel-2); border: 1px solid var(--border); color: var(--muted); margin-right: 8px; }
+  .stage-pill.forward { color: var(--accent-2); border-color: rgba(102,211,168,0.4); }
+  .stage-pill.backward { color: var(--warn); border-color: rgba(255,184,107,0.4); }
+  .stage-pill.done { color: var(--accent); border-color: rgba(122,162,255,0.4); }
+  /* Ways grid */
+  .ways-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px; }
+  @media (max-width: 900px) { .ways-grid { grid-template-columns: 1fr; } }
+  .way { background: var(--panel); border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; }
+  .way h3 { margin-top: 0; margin-bottom: 6px; color: var(--accent); }
+  .way .tag { font-size: 0.7rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em;
+    margin-bottom: 10px; display: block; }
+  .way pre { font-size: 0.78em; }
+  .way .when { color: var(--muted); font-size: 0.85rem; margin-top: 10px; padding-top: 10px;
+    border-top: 1px solid var(--border); }
+  .key { color: var(--accent-2); }
+  /* Pitfalls */
+  .pitfall { border-left: 3px solid var(--danger); padding-left: 14px; margin: 14px 0; }
+  .pitfall h4 { color: var(--danger); margin: 0 0 4px; text-transform: none; letter-spacing: 0; font-size: 0.95rem; }
+  /* Misc */
+  svg text { font-family: ui-monospace, SFMono-Regular, monospace; }
+  .narration { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 14px; margin-top: 10px; font-size: 0.86rem; color: var(--text);
+    font-family: ui-monospace, SFMono-Regular, monospace; min-height: 20px; }
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <a class="back" href="index.html">← back to main path</a>
+    <h1>Autograd Tutorial</h1>
+    <nav>
+      <a href="#intro">Intro</a>
+      <a href="#visualizer">Interactive graph</a>
+      <a href="#ways">8 ways to create</a>
+      <a href="#pitfalls">Common pitfalls</a>
+      <a href="#sandbox">Try in Colab</a>
+    </nav>
+  </aside>
+  <main>
+    <h1>How autograd actually works — interactively</h1>
+    <p class="muted">Pick an expression. Step through the forward pass, then the backward pass. Watch each tensor's <code>.grad</code> fill in. This is exactly what PyTorch does under the hood — just smaller and slower so you can see it.</p>
+
+    <section id="intro">
+      <h2>The one-paragraph version</h2>
+      <p>Autograd is reverse-mode automatic differentiation. As you do operations on a tensor with <code>requires_grad=True</code>, PyTorch silently builds a <strong>DAG</strong> where nodes are tensors and edges record how each tensor was produced. When you call <code>loss.backward()</code>, autograd walks that DAG <em>in reverse</em>, applying the chain rule at each edge, and accumulates gradients into the <code>.grad</code> field of every leaf tensor that fed into the loss.</p>
+      <div class="card">
+        <h3>Same example, three views</h3>
+        <p>Take a single computation — <code>y = x³ + 2x</code> at <code>x = 2</code>:</p>
+<pre><code>import torch
+x = torch.tensor(2.0, requires_grad=True)
+y = x ** 3 + 2 * x
+y.backward()
+print(x.grad)   # 3x² + 2 = 14.0</code></pre>
+        <p class="muted" style="margin-top: 10px">Below, the same computation is drawn as a graph. Hit <strong>Step forward</strong> to walk through it node by node, then <strong>Step backward</strong> to watch gradients propagate.</p>
+      </div>
+    </section>
+
+    <section id="visualizer">
+      <h2>The interactive graph</h2>
+      <div class="controls">
+        <label for="example-select" class="muted" style="font-size: 0.86rem">Expression:</label>
+        <select id="example-select">
+          <option value="square">y = x²  &nbsp;(simplest)</option>
+          <option value="cubic" selected>y = x³ + 2x  &nbsp;(chain rule)</option>
+          <option value="shared">z = (x + y) · y  &nbsp;(shared subexpression)</option>
+          <option value="linreg">loss = (w·x + b - target)²  &nbsp;(linear regression)</option>
+          <option value="twoinput">y = sin(x₁) · x₂²  &nbsp;(multi-input, nonlinear)</option>
+        </select>
+        <div class="spacer"></div>
+        <span class="step-info" id="stage-display"><span class="stage-pill" id="stage-pill">idle</span><span id="step-msg">click "Build" to start</span></span>
+      </div>
+
+      <div class="controls">
+        <button id="btn-build" class="primary">Build graph</button>
+        <button id="btn-step-fwd" disabled>Forward step ▶</button>
+        <button id="btn-all-fwd" disabled>Run forward ▶▶</button>
+        <button id="btn-step-bwd" disabled>Backward step ◀</button>
+        <button id="btn-all-bwd" disabled>Run backward ◀◀</button>
+        <button id="btn-reset">Reset</button>
+      </div>
+
+      <div class="viz-wrap">
+        <div class="viz-panel">
+          <h4>The DAG (forward edges drawn; gradients flow the other way)</h4>
+          <svg id="graph" class="graph-svg" viewBox="0 0 700 380">
+            <defs>
+              <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5"
+                      markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--edge)"/>
+              </marker>
+              <marker id="arrow-active" viewBox="0 0 10 10" refX="9" refY="5"
+                      markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--edge-active)"/>
+              </marker>
+              <marker id="arrow-back" viewBox="0 0 10 10" refX="9" refY="5"
+                      markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="var(--grad-fill)"/>
+              </marker>
+            </defs>
+          </svg>
+          <div class="narration" id="narration">Pick an expression and click <strong>Build graph</strong>.</div>
+          <div class="legend">
+            <span><span class="dot" style="background: var(--node-leaf)"></span>leaf (requires_grad)</span>
+            <span><span class="dot" style="background: var(--node-op)"></span>op node</span>
+            <span><span class="dot" style="background: var(--node-output)"></span>output / current</span>
+            <span><span class="dot" style="background: var(--node-done)"></span>computed</span>
+            <span><span class="dot" style="background: var(--grad-fill)"></span>gradient flow</span>
+          </div>
+        </div>
+        <div class="viz-panel">
+          <h4>Equivalent PyTorch code</h4>
+          <pre id="py-code"><code># pick an example to load PyTorch code</code></pre>
+          <h4 style="margin-top: 16px">Tensor state</h4>
+          <table class="state-table" id="state-table">
+            <thead><tr><th>tensor</th><th>op</th><th>value</th><th>.grad</th></tr></thead>
+            <tbody><tr><td colspan="4" class="muted" style="text-align:center">build the graph to populate</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <section id="ways">
+      <h2>Eight ways to create autograd-enabled tensors</h2>
+      <p class="muted">PyTorch gives you several entry points into the autograd graph. They all build the same DAG; they differ in ergonomics and intent.</p>
+      <div class="ways-grid">
+
+        <div class="way">
+          <span class="tag">Way 1 · explicit constructor</span>
+          <h3><code>torch.tensor(..., requires_grad=True)</code></h3>
+<pre><code>x = torch.tensor([2.0, 3.0], requires_grad=True)
+y = (x ** 2).sum()
+y.backward()
+print(x.grad)        # tensor([4., 6.])</code></pre>
+          <div class="when"><span class="key">When:</span> the most explicit form. Use when you're constructing a new leaf tensor from data and want it in the graph from the start.</div>
+        </div>
+
+        <div class="way">
+          <span class="tag">Way 2 · in-place opt-in</span>
+          <h3><code>x.requires_grad_(True)</code></h3>
+<pre><code>x = torch.randn(10)
+x.requires_grad_(True)        # mutates x in place
+y = (x ** 2).sum()
+y.backward()
+print(x.grad.shape)           # torch.Size([10])</code></pre>
+          <div class="when"><span class="key">When:</span> you already have a tensor (e.g., loaded from a file) and want to enable gradients without recreating it. Note the trailing underscore — PyTorch convention for in-place mutation.</div>
+        </div>
+
+        <div class="way">
+          <span class="tag">Way 3 · derived tensors</span>
+          <h3>Just operate on a leaf</h3>
+<pre><code>x = torch.tensor(2.0, requires_grad=True)
+# y inherits requires_grad — automatically
+y = x ** 3 + 2 * x
+print(y.requires_grad, y.grad_fn)
+# True  &lt;AddBackward0&gt;</code></pre>
+          <div class="when"><span class="key">When:</span> almost all the time. Any tensor produced by ops on a <code>requires_grad=True</code> tensor automatically has <code>requires_grad=True</code> and a <code>grad_fn</code> pointing at the op that produced it.</div>
+        </div>
+
+        <div class="way">
+          <span class="tag">Way 4 · learned parameters</span>
+          <h3><code>nn.Parameter(...)</code></h3>
+<pre><code>import torch.nn as nn
+W = nn.Parameter(torch.randn(10, 5))
+# requires_grad=True by default
+# When assigned to an nn.Module attribute,
+# it's auto-registered for optim and FSDP.</code></pre>
+          <div class="when"><span class="key">When:</span> defining learnable weights in a module. <code>nn.Parameter</code> is just a <code>Tensor</code> with <code>requires_grad=True</code> + special registration behavior.</div>
+        </div>
+
+        <div class="way">
+          <span class="tag">Way 5 · nn.Module auto-registration</span>
+          <h3>Standard layers</h3>
+<pre><code>linear = nn.Linear(10, 5)
+# Internally:
+#   self.weight = nn.Parameter(torch.empty(5, 10))
+#   self.bias   = nn.Parameter(torch.empty(5))
+# Both already have requires_grad=True.
+for p in linear.parameters():
+    print(p.shape, p.requires_grad)</code></pre>
+          <div class="when"><span class="key">When:</span> using any built-in layer. You never call <code>requires_grad=True</code> manually; the modules do it.</div>
+        </div>
+
+        <div class="way">
+          <span class="tag">Way 6 · custom function</span>
+          <h3><code>torch.autograd.Function</code></h3>
+<pre><code>class MyReLU(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, x):
+        ctx.save_for_backward(x)
+        return x.clamp(min=0)
+    @staticmethod
+    def backward(ctx, grad_out):
+        x, = ctx.saved_tensors
+        return grad_out * (x &gt; 0).float()
+
+y = MyReLU.apply(x)            # plugs into autograd</code></pre>
+          <div class="when"><span class="key">When:</span> you need a custom op with custom backward — for performance, for numerical stability, or to wrap a non-differentiable approximation with a surrogate gradient.</div>
+        </div>
+
+        <div class="way">
+          <span class="tag">Way 7 · context — disable</span>
+          <h3><code>with torch.no_grad():</code></h3>
+<pre><code>x = torch.tensor(2.0, requires_grad=True)
+with torch.no_grad():
+    y = x ** 3                # y.requires_grad == False
+# No graph built. Use at eval time + during sampling.
+# Significant memory + speed gain.</code></pre>
+          <div class="when"><span class="key">When:</span> inference, evaluation, sampling. Or any time you compute something with grad-enabled tensors but don't want a graph (e.g., logging).</div>
+        </div>
+
+        <div class="way">
+          <span class="tag">Way 8 · break the graph</span>
+          <h3><code>tensor.detach()</code></h3>
+<pre><code>x = torch.tensor(2.0, requires_grad=True)
+y = x ** 3
+z = y.detach() + 5
+# z shares storage with y, but is OUT of the graph.
+# Backward through z stops at the detach.
+print(z.requires_grad)       # False</code></pre>
+          <div class="when"><span class="key">When:</span> using a tensor's value as a constant — target networks in RL, gradient stopping in distillation (concept 44), caching for logging without growing the graph.</div>
+        </div>
+
+      </div>
+    </section>
+
+    <section id="pitfalls">
+      <h2>Common pitfalls</h2>
+      <div class="card">
+        <div class="pitfall">
+          <h4>1. Forgetting <code>optimizer.zero_grad()</code></h4>
+          <p>Gradients <em>accumulate</em> on each <code>.backward()</code>. Without zeroing, batch N's gradient contains contributions from batches 1..N-1, the LR effectively grows, loss diverges. (Gradient accumulation — intentionally calling <code>.backward()</code> multiple times before <code>step()</code> — relies on this same behavior.)</p>
+        </div>
+        <div class="pitfall">
+          <h4>2. Calling <code>.backward()</code> twice without <code>retain_graph=True</code></h4>
+          <p>The graph is freed after backward to reclaim memory. Re-calling raises <code>RuntimeError: Trying to backward through the graph a second time</code>. If you genuinely need multiple backward passes (rare — usually only in second-order methods), pass <code>retain_graph=True</code> on the first call.</p>
+        </div>
+        <div class="pitfall">
+          <h4>3. In-place ops on tensors needed for backward</h4>
+          <p><code>x.add_(1)</code> mutates <code>x</code> in place. If <code>x</code>'s pre-mutation value was needed by some saved-for-backward op, you get <code>RuntimeError: one of the variables needed for gradient computation has been modified by an inplace operation</code>. Fix: use the non-in-place version (<code>x = x + 1</code>) or clone first.</p>
+        </div>
+        <div class="pitfall">
+          <h4>4. Trying to read <code>.grad</code> on a non-leaf tensor</h4>
+          <p>By default <code>.grad</code> is only populated on leaf tensors (created by the user, not derived from ops). For an intermediate tensor, either call <code>.retain_grad()</code> before backward, or use <code>torch.autograd.grad(out, [intermediate])</code> directly.</p>
+        </div>
+        <div class="pitfall">
+          <h4>5. Forgetting <code>model.eval()</code> + <code>torch.no_grad()</code> at inference</h4>
+          <p><code>model.eval()</code> switches Dropout/BatchNorm to eval mode. <code>no_grad()</code> tells autograd not to build a graph. Forget either and your eval is biased and uses 2-3× more memory than necessary.</p>
+        </div>
+      </div>
+    </section>
+
+    <section id="sandbox">
+      <h2>Try it in Colab</h2>
+      <div class="card">
+        <p>The same examples, but in real PyTorch — copy this into a Colab cell:</p>
+<pre><code>!pip install -q torch
+import torch
+
+# Example: y = x³ + 2x  at x = 2
+x = torch.tensor(2.0, requires_grad=True)
+y = x ** 3 + 2 * x
+y.backward()
+print("y     =", y.item())          # 12.0
+print("dy/dx =", x.grad.item())     # 14.0  (3·2² + 2)
+
+# Verify with a different point
+x.grad.zero_()                      # IMPORTANT — gradients accumulate
+x.data = torch.tensor(3.0)
+y2 = x ** 3 + 2 * x
+y2.backward()
+print("dy/dx at x=3:", x.grad.item())   # 29.0  (3·3² + 2)</code></pre>
+        <p style="margin-top: 12px"><a href="index.html#c1">Back to concept 1</a> · <a href="index.html#a1">Phase 1 Assignment 1</a></p>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script>
+// =============================================================================
+// Tiny autograd engine — exactly like Karpathy's micrograd, in JavaScript.
+// Each Var holds a value, a grad, parents, and a local backward function.
+// =============================================================================
+let _id = 0;
+class Var {
+  constructor(value, label, op, parents) {
+    this.value = value;
+    this.label = label || '';
+    this.op = op || null;          // 'leaf' for inputs, '+' '*' 'pow' 'sin' etc.
+    this.parents = parents || [];
+    this.grad = 0;
+    this._backward = () => {};
+    this._localGrad = '';           // a human-readable explanation
+    this.id = _id++;
+    this.depth = 0;
+  }
+
+  static leaf(v, label) {
+    const n = new Var(v, label, 'leaf');
+    return n;
+  }
+  static c(v, label) {
+    return new Var(v, label || String(v), 'const');
+  }
+
+  add(o) {
+    o = o instanceof Var ? o : Var.c(o);
+    const out = new Var(this.value + o.value, '', '+', [this, o]);
+    const self = this;
+    out._backward = function () {
+      self.grad += out.grad;
+      o.grad    += out.grad;
+    };
+    out._localGrad = '+: passes its grad to both inputs';
+    return out;
+  }
+  sub(o) {
+    o = o instanceof Var ? o : Var.c(o);
+    const out = new Var(this.value - o.value, '', '−', [this, o]);
+    const self = this;
+    out._backward = function () {
+      self.grad += out.grad;
+      o.grad    -= out.grad;
+    };
+    out._localGrad = '−: passes grad to a, negates grad to b';
+    return out;
+  }
+  mul(o) {
+    o = o instanceof Var ? o : Var.c(o);
+    const out = new Var(this.value * o.value, '', '×', [this, o]);
+    const self = this;
+    out._backward = function () {
+      self.grad += o.value    * out.grad;
+      o.grad    += self.value * out.grad;
+    };
+    out._localGrad = '×: a.grad += b.value · out.grad, and vice versa';
+    return out;
+  }
+  pow(p) {
+    const out = new Var(Math.pow(this.value, p), '', `^${p}`, [this]);
+    const self = this;
+    out._backward = function () {
+      self.grad += p * Math.pow(self.value, p - 1) * out.grad;
+    };
+    out._localGrad = `^${p}: a.grad += ${p}·a^${p - 1}·out.grad`;
+    return out;
+  }
+  sin() {
+    const out = new Var(Math.sin(this.value), '', 'sin', [this]);
+    const self = this;
+    out._backward = function () {
+      self.grad += Math.cos(self.value) * out.grad;
+    };
+    out._localGrad = 'sin: a.grad += cos(a) · out.grad';
+    return out;
+  }
+}
+
+function topoOrder(root) {
+  const visited = new Set();
+  const order = [];
+  function visit(n) {
+    if (visited.has(n.id)) return;
+    visited.add(n.id);
+    for (const p of n.parents) visit(p);
+    order.push(n);
+  }
+  visit(root);
+  return order;
+}
+
+// =============================================================================
+// Example library — each returns { root, pyCode, description }
+// =============================================================================
+const examples = {
+  square: () => {
+    const x = Var.leaf(2.0, 'x');
+    const y = x.pow(2);                 y.label = 'y';
+    return {
+      root: y,
+      pyCode:
+`import torch
+x = torch.tensor(2.0, requires_grad=True)
+y = x ** 2
+y.backward()
+print(x.grad)   # 2x = 4.0`,
+      hint: 'y = x² ;   dy/dx = 2x = 4 at x=2',
+    };
+  },
+  cubic: () => {
+    const x = Var.leaf(2.0, 'x');
+    const x3 = x.pow(3);                x3.label = 'x³';
+    const two = Var.c(2);
+    const twoX = two.mul(x);            twoX.label = '2x';
+    const y = x3.add(twoX);             y.label = 'y';
+    return {
+      root: y,
+      pyCode:
+`import torch
+x = torch.tensor(2.0, requires_grad=True)
+y = x ** 3 + 2 * x
+y.backward()
+print(x.grad)   # 3x² + 2 = 14.0`,
+      hint: 'y = x³ + 2x ;   dy/dx = 3x² + 2 = 14 at x=2',
+    };
+  },
+  shared: () => {
+    const x = Var.leaf(2.0, 'x');
+    const y = Var.leaf(3.0, 'y');
+    const sum = x.add(y);               sum.label = 'a = x+y';
+    const z = sum.mul(y);               z.label = 'z = a·y';
+    return {
+      root: z,
+      pyCode:
+`import torch
+x = torch.tensor(2.0, requires_grad=True)
+y = torch.tensor(3.0, requires_grad=True)
+z = (x + y) * y          # y appears twice
+z.backward()
+print(x.grad, y.grad)   # 3.0   8.0
+# Note: y.grad gets contributions from BOTH paths,
+# because autograd accumulates over edges.`,
+      hint: 'z = (x+y)·y. ∂z/∂x = y = 3. ∂z/∂y = (x+y) + y = 8.',
+    };
+  },
+  linreg: () => {
+    const w = Var.leaf(0.5, 'w');
+    const x = Var.leaf(2.0, 'x');
+    const b = Var.leaf(0.1, 'b');
+    const t = Var.leaf(2.0, 'target');
+    const wx = w.mul(x);                wx.label = 'wx';
+    const pred = wx.add(b);             pred.label = 'pred';
+    const err = pred.sub(t);            err.label = 'err';
+    const loss = err.pow(2);            loss.label = 'loss';
+    return {
+      root: loss,
+      pyCode:
+`import torch
+w = torch.tensor(0.5, requires_grad=True)
+b = torch.tensor(0.1, requires_grad=True)
+x = torch.tensor(2.0)            # input, not learnable
+t = torch.tensor(2.0)            # target
+
+pred = w * x + b
+loss = (pred - t) ** 2
+loss.backward()
+print(w.grad, b.grad)            # gradients used by optim.SGD`,
+      hint: 'A one-step regression. loss = (w·x + b − t)². Backward computes dL/dw and dL/db.',
+    };
+  },
+  twoinput: () => {
+    const x1 = Var.leaf(1.0, 'x₁');
+    const x2 = Var.leaf(3.0, 'x₂');
+    const s = x1.sin();                 s.label = 'sin(x₁)';
+    const x2sq = x2.pow(2);             x2sq.label = 'x₂²';
+    const y = s.mul(x2sq);              y.label = 'y';
+    return {
+      root: y,
+      pyCode:
+`import torch
+x1 = torch.tensor(1.0, requires_grad=True)
+x2 = torch.tensor(3.0, requires_grad=True)
+y = torch.sin(x1) * x2 ** 2
+y.backward()
+print(x1.grad, x2.grad)
+# dy/dx1 = cos(x1)·x2² ≈ 4.86
+# dy/dx2 = sin(x1)·2x2 ≈ 5.05`,
+      hint: 'y = sin(x₁)·x₂². Chain rule across two inputs.',
+    };
+  },
+};
+
+// =============================================================================
+// Layout — assign x,y to each node based on topological depth
+// =============================================================================
+function layout(root, svgW, svgH) {
+  const order = topoOrder(root);
+  // depth = max(parent depth) + 1
+  for (const n of order) {
+    n.depth = n.parents.length === 0 ? 0 : Math.max(...n.parents.map(p => p.depth)) + 1;
+  }
+  const maxDepth = Math.max(...order.map(n => n.depth));
+  // group by depth for y-positioning
+  const byDepth = {};
+  for (const n of order) {
+    (byDepth[n.depth] = byDepth[n.depth] || []).push(n);
+  }
+  const cols = maxDepth + 1;
+  const xPad = 70, yPad = 50;
+  const colW = (svgW - 2 * xPad) / Math.max(cols - 1, 1);
+  for (let d = 0; d <= maxDepth; d++) {
+    const ns = byDepth[d];
+    const rowH = (svgH - 2 * yPad) / Math.max(ns.length, 1);
+    ns.forEach((n, i) => {
+      n.x = cols === 1 ? svgW / 2 : xPad + d * colW;
+      n.y = yPad + rowH * (i + 0.5);
+    });
+  }
+  return order;
+}
+
+// =============================================================================
+// Renderer + animation state
+// =============================================================================
+const svg = document.getElementById('graph');
+const NODE_R = 30;
+const SVG_W = 700, SVG_H = 380;
+
+const state = {
+  currentExample: null,
+  order: [],
+  fwdIdx: 0,        // index of next forward node to highlight
+  bwdIdx: -1,       // index of next backward node (will be order.length - 1 down)
+  phase: 'idle',    // idle | building | forward | forward-done | backward | done
+  highlighted: new Set(),     // currently highlighted (orange) node ids
+  completedFwd: new Set(),    // green forward
+  completedBwd: new Set(),    // grad has been computed
+};
+
+function clearSvg() {
+  // Keep <defs>; remove everything else
+  const defs = svg.querySelector('defs');
+  while (svg.lastChild && svg.lastChild !== defs) svg.removeChild(svg.lastChild);
+}
+
+function colorFor(n) {
+  if (state.highlighted.has(n.id)) return 'var(--node-active)';
+  if (state.completedBwd.has(n.id)) return 'var(--node-output)';
+  if (state.completedFwd.has(n.id)) return 'var(--node-done)';
+  if (n.op === 'leaf') return 'var(--node-leaf)';
+  return 'var(--node-pending)';
+}
+
+function strokeFor(n) {
+  if (state.highlighted.has(n.id)) return 'var(--edge-active)';
+  return 'var(--border)';
+}
+
+function renderGraph() {
+  clearSvg();
+  if (!state.order.length) return;
+  // edges first
+  for (const n of state.order) {
+    for (const p of n.parents) {
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', p.x); line.setAttribute('y1', p.y);
+      line.setAttribute('x2', n.x); line.setAttribute('y2', n.y);
+      const activeFwd = state.highlighted.has(n.id);
+      const activeBwd = state.highlighted.has(p.id) && state.phase === 'backward';
+      const stroke = activeBwd ? 'var(--grad-fill)' : (activeFwd ? 'var(--edge-active)' : 'var(--edge)');
+      line.setAttribute('stroke', stroke);
+      line.setAttribute('stroke-width', activeFwd || activeBwd ? '2.5' : '1.5');
+      const marker = activeBwd ? 'url(#arrow-back)' : (activeFwd ? 'url(#arrow-active)' : 'url(#arrow)');
+      line.setAttribute('marker-end', marker);
+      svg.appendChild(line);
+    }
+  }
+  // nodes
+  for (const n of state.order) {
+    const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+    g.setAttribute('transform', `translate(${n.x}, ${n.y})`);
+
+    const c = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    c.setAttribute('r', NODE_R);
+    c.setAttribute('fill', colorFor(n));
+    c.setAttribute('stroke', strokeFor(n));
+    c.setAttribute('stroke-width', '2');
+    g.appendChild(c);
+
+    // label
+    const t1 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+    t1.setAttribute('text-anchor', 'middle');
+    t1.setAttribute('y', '-2');
+    t1.setAttribute('fill', '#0b0d12');
+    t1.setAttribute('font-size', '12');
+    t1.setAttribute('font-weight', '600');
+    t1.textContent = n.label || n.op || '';
+    g.appendChild(t1);
+
+    // value (only after computed in forward, or always for leaves)
+    if (n.op === 'leaf' || n.op === 'const' || state.completedFwd.has(n.id) || state.highlighted.has(n.id)) {
+      const t2 = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      t2.setAttribute('text-anchor', 'middle');
+      t2.setAttribute('y', '12');
+      t2.setAttribute('fill', '#0b0d12');
+      t2.setAttribute('font-size', '10');
+      t2.textContent = formatNum(n.value);
+      g.appendChild(t2);
+    }
+
+    // grad badge (only if non-zero)
+    if (Math.abs(n.grad) > 1e-9) {
+      const badge = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+      badge.setAttribute('transform', `translate(${NODE_R + 4}, -${NODE_R - 4})`);
+      const br = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      br.setAttribute('rx', '4'); br.setAttribute('ry', '4');
+      br.setAttribute('x', '0'); br.setAttribute('y', '-8');
+      br.setAttribute('width', '38'); br.setAttribute('height', '16');
+      br.setAttribute('fill', 'var(--grad-fill)');
+      const bt = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      bt.setAttribute('x', '19'); bt.setAttribute('y', '3');
+      bt.setAttribute('text-anchor', 'middle');
+      bt.setAttribute('font-size', '10');
+      bt.setAttribute('fill', '#0b0d12');
+      bt.setAttribute('font-weight', '600');
+      bt.textContent = '∇=' + formatNum(n.grad);
+      badge.appendChild(br); badge.appendChild(bt);
+      g.appendChild(badge);
+    }
+
+    svg.appendChild(g);
+  }
+}
+
+function formatNum(v) {
+  if (Math.abs(v) < 1e-4 && v !== 0) return v.toExponential(2);
+  return Math.abs(v) > 100 ? v.toFixed(0) : v.toFixed(Math.abs(v) < 10 ? 3 : 2);
+}
+
+function renderStateTable() {
+  const tbody = document.querySelector('#state-table tbody');
+  tbody.innerHTML = '';
+  if (!state.order.length) {
+    tbody.innerHTML = `<tr><td colspan="4" class="muted" style="text-align:center">build the graph to populate</td></tr>`;
+    return;
+  }
+  for (const n of state.order) {
+    const tr = document.createElement('tr');
+    if (n.op === 'leaf') tr.classList.add('leaf');
+    if (n === state.order[state.order.length - 1]) tr.classList.add('output');
+    const label = n.label || (n.op === 'const' ? `c=${n.value}` : `t${n.id}`);
+    const op = n.op === 'leaf' ? 'leaf' : (n.op === 'const' ? 'const' : n.op);
+    const showVal = (n.op === 'leaf' || n.op === 'const' || state.completedFwd.has(n.id));
+    const val = showVal ? formatNum(n.value) : '—';
+    const grad = Math.abs(n.grad) < 1e-9 ? '0' : formatNum(n.grad);
+    const gradClass = Math.abs(n.grad) < 1e-9 ? 'zero-grad' : 'grad-cell';
+    tr.innerHTML = `<td>${label}</td><td>${op}</td><td>${val}</td><td class="${gradClass}">${grad}</td>`;
+    tbody.appendChild(tr);
+  }
+}
+
+function setStage(phase, msg) {
+  state.phase = phase;
+  const pill = document.getElementById('stage-pill');
+  pill.className = 'stage-pill ' + (
+    phase === 'forward' || phase === 'forward-done' ? 'forward' :
+    phase === 'backward' ? 'backward' :
+    phase === 'done' ? 'done' : ''
+  );
+  pill.textContent = phase;
+  document.getElementById('step-msg').textContent = msg || '';
+  document.getElementById('narration').innerHTML = msg || '&nbsp;';
+}
+
+// =============================================================================
+// Wire up controls
+// =============================================================================
+function loadExample(key) {
+  const e = examples[key]();
+  state.currentExample = e;
+  state.order = layout(e.root, SVG_W, SVG_H);
+  // Reset values on derived nodes so we can animate forward
+  for (const n of state.order) {
+    if (n.op !== 'leaf' && n.op !== 'const') n._cached = n.value;
+    n.grad = 0;
+  }
+  state.fwdIdx = 0;
+  state.bwdIdx = state.order.length - 1;
+  state.highlighted.clear();
+  state.completedFwd.clear();
+  state.completedBwd.clear();
+  // leaves and constants are "already computed" — they're inputs
+  for (const n of state.order) {
+    if (n.op === 'leaf' || n.op === 'const') state.completedFwd.add(n.id);
+  }
+  // skip leaves/consts when stepping forward
+  while (state.fwdIdx < state.order.length &&
+         (state.order[state.fwdIdx].op === 'leaf' || state.order[state.fwdIdx].op === 'const')) {
+    state.fwdIdx++;
+  }
+  document.getElementById('py-code').textContent = e.pyCode;
+  setStage('idle', e.hint);
+  enableButtons({ build: true, fwd: true, bwd: false, reset: true });
+  renderGraph();
+  renderStateTable();
+}
+
+function stepForward() {
+  if (state.fwdIdx >= state.order.length) return;
+  const n = state.order[state.fwdIdx];
+  state.highlighted.clear();
+  state.highlighted.add(n.id);
+  state.completedFwd.add(n.id);
+  const parentStr = n.parents.map(p => `${p.label || p.op}=${formatNum(p.value)}`).join(', ');
+  const msg = `forward step: compute <strong>${n.label || n.op}</strong> = ${n.op}(${parentStr}) → ${formatNum(n.value)}`;
+  setStage('forward', msg);
+  state.fwdIdx++;
+  // skip leaves/consts in subsequent steps
+  while (state.fwdIdx < state.order.length &&
+         (state.order[state.fwdIdx].op === 'leaf' || state.order[state.fwdIdx].op === 'const')) {
+    state.fwdIdx++;
+  }
+  if (state.fwdIdx >= state.order.length) {
+    // forward done — initialize root grad
+    setTimeout(() => {
+      state.highlighted.clear();
+      setStage('forward-done', `forward complete. <strong>${state.order[state.order.length-1].label}.backward()</strong> seeds output.grad = 1.0`);
+      state.order[state.order.length - 1].grad = 1.0;
+      state.completedBwd.add(state.order[state.order.length - 1].id);
+      enableButtons({ build: true, fwd: false, bwd: true, reset: true });
+      renderGraph();
+      renderStateTable();
+    }, 50);
+  }
+  renderGraph();
+  renderStateTable();
+}
+
+function stepBackward() {
+  // find the next not-yet-backward node (in reverse topo order)
+  let n = null;
+  while (state.bwdIdx >= 0) {
+    const cand = state.order[state.bwdIdx];
+    if (!state.completedBwd.has(cand.id) || cand === state.order[state.order.length - 1]) {
+      // The output is in completedBwd already (we set grad=1.0 at forward-done).
+      // But we still want to RUN its _backward to push grads to parents.
+      n = cand;
+      break;
+    }
+    state.bwdIdx--;
+  }
+  if (n === null) {
+    state.highlighted.clear();
+    setStage('done', 'backward complete. All leaf gradients are populated.');
+    enableButtons({ build: true, fwd: false, bwd: false, reset: true });
+    renderGraph();
+    renderStateTable();
+    return;
+  }
+  state.highlighted.clear();
+  state.highlighted.add(n.id);
+  // Run this node's backward — pushes gradient into its parents.
+  if (n.op !== 'leaf' && n.op !== 'const') {
+    n._backward();
+    for (const p of n.parents) state.completedBwd.add(p.id);
+  }
+  state.completedBwd.add(n.id);
+  const parentList = n.parents.length
+    ? n.parents.map(p => `${p.label || p.op}.grad ← ${formatNum(p.grad)}`).join('; ')
+    : 'no parents';
+  const localGrad = n._localGrad || '';
+  setStage('backward',
+    `backward: at <strong>${n.label || n.op}</strong> (out.grad=${formatNum(n.grad)}). ` +
+    (localGrad ? `<em>${localGrad}</em>. ` : '') +
+    `Push: ${parentList}`);
+  state.bwdIdx--;
+  renderGraph();
+  renderStateTable();
+}
+
+function enableButtons({ build, fwd, bwd, reset }) {
+  document.getElementById('btn-build').disabled = !build;
+  document.getElementById('btn-step-fwd').disabled = !fwd;
+  document.getElementById('btn-all-fwd').disabled = !fwd;
+  document.getElementById('btn-step-bwd').disabled = !bwd;
+  document.getElementById('btn-all-bwd').disabled = !bwd;
+  document.getElementById('btn-reset').disabled = !reset;
+}
+
+function runAllForward() {
+  while (state.fwdIdx < state.order.length) stepForward();
+}
+function runAllBackward() {
+  // bwdIdx counts down; loop until done
+  let safety = state.order.length * 2;
+  while (safety-- > 0) {
+    const before = state.bwdIdx;
+    stepBackward();
+    if (state.phase === 'done') break;
+    if (state.bwdIdx === before) break;   // no progress
+  }
+}
+
+// Wire events
+document.getElementById('example-select').addEventListener('change', e => {
+  loadExample(e.target.value);
+});
+document.getElementById('btn-build').addEventListener('click', () => {
+  loadExample(document.getElementById('example-select').value);
+});
+document.getElementById('btn-step-fwd').addEventListener('click', stepForward);
+document.getElementById('btn-all-fwd').addEventListener('click', runAllForward);
+document.getElementById('btn-step-bwd').addEventListener('click', stepBackward);
+document.getElementById('btn-all-bwd').addEventListener('click', runAllBackward);
+document.getElementById('btn-reset').addEventListener('click', () => {
+  loadExample(document.getElementById('example-select').value);
+});
+
+// Build the default example on load
+loadExample('cubic');
+</script>
+</body>
+</html>

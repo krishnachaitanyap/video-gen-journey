@@ -546,6 +546,7 @@ y = x ** 3
 y.backward()
 print(x.grad)  # 3 * x^2 = 12.0</code></pre>
         <p class="muted">Mental model from your background: think of autograd like a <em>distributed tracing span tree</em> — every op is a span, <code>.backward()</code> walks it in reverse to propagate gradients.</p>
+        <p><a href="autograd-tutorial.html"><strong>→ Visual interactive tutorial</strong></a> — step through forward and backward on five worked examples, plus all 8 ways to create autograd-enabled tensors.</p>
         <div class="notebook">
           <div class="nb-title">Try it in Colab</div>
           <div class="nb-sub">Paste each cell into a fresh notebook.</div>
