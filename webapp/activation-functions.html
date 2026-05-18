@@ -1,0 +1,1258 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Activation Functions — 3D Interactive Tour</title>
+<style>
+  :root {
+    --bg: #0b0d12;
+    --panel: #161a22;
+    --panel-2: #1c2230;
+    --border: #2a3142;
+    --text: #e6e9ef;
+    --muted: #9aa3b2;
+    --accent: #7aa2ff;
+    --accent-2: #66d3a8;
+    --warn: #ffb86b;
+    --danger: #ff6b6b;
+    --purple: #c084fc;
+    --code-bg: #0b0d12;
+    --t1: #66d3a8;     /* tier 1 — layman    */
+    --t2: #7aa2ff;     /* tier 2 — problem   */
+    --t3: #c084fc;     /* tier 3 — visual    */
+    --t4: #ffb86b;     /* tier 4 — math      */
+    --t5: #ff6b6b;     /* tier 5 — advanced  */
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; padding: 0; background: var(--bg); color: var(--text);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    line-height: 1.6; -webkit-font-smoothing: antialiased; }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  code { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    background: var(--code-bg); padding: 1px 6px; border-radius: 4px; font-size: 0.9em; color: #d6e0ff; }
+  pre { background: var(--code-bg); padding: 12px 14px; border-radius: 8px; border: 1px solid var(--border);
+    overflow-x: auto; font-size: 0.84em; margin: 8px 0; }
+  pre code { background: transparent; padding: 0; }
+  h1, h2, h3, h4 { line-height: 1.25; }
+  h1 { font-size: 1.8rem; margin: 0 0 8px; }
+  h2 { font-size: 1.45rem; margin-top: 48px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--border); display: flex; align-items: center; gap: 12px; }
+  h2 .badge { display: inline-block; background: var(--panel-2); border: 1px solid var(--border);
+    padding: 2px 10px; border-radius: 6px; font-size: 0.7rem; color: var(--muted);
+    text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500; }
+  h3 { font-size: 1.05rem; margin-top: 22px; }
+  p { color: var(--text); }
+  .muted { color: var(--muted); }
+  /* Layout */
+  .app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+  .sidebar { background: var(--panel); border-right: 1px solid var(--border); padding: 20px 16px;
+    position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+  .sidebar h1 { font-size: 0.92rem; color: var(--muted); text-transform: uppercase;
+    letter-spacing: 0.1em; margin-bottom: 14px; }
+  .sidebar nav a { display: block; padding: 6px 10px; border-radius: 6px; color: var(--text);
+    font-size: 0.9rem; margin-bottom: 2px; }
+  .sidebar nav a:hover { background: var(--panel-2); text-decoration: none; }
+  .sidebar nav a.section { color: var(--muted); font-size: 0.72rem; text-transform: uppercase;
+    letter-spacing: 0.08em; margin-top: 14px; padding: 4px 10px; }
+  .sidebar nav a.back { color: var(--accent); margin-bottom: 16px; padding-left: 0; font-size: 0.85rem; }
+  main { padding: 32px 48px 80px; max-width: 1080px; }
+  /* Sticky 3D viewer */
+  .viewer-card { position: sticky; top: 0; z-index: 10;
+    background: linear-gradient(180deg, var(--panel) 0%, var(--bg) 100%);
+    border-bottom: 1px solid var(--border);
+    margin: -32px -48px 24px; padding: 14px 48px; }
+  .viewer-header { display: flex; justify-content: space-between; align-items: baseline; gap: 16px;
+    margin-bottom: 10px; flex-wrap: wrap; }
+  .viewer-header .fn-name { font-size: 1.3rem; font-weight: 600; color: var(--accent-2); }
+  .viewer-header .fn-formula { font-family: ui-monospace, SFMono-Regular, monospace;
+    color: var(--warn); font-size: 0.95rem; background: var(--panel-2);
+    padding: 4px 10px; border-radius: 6px; border: 1px solid var(--border); }
+  .canvas-wrap { position: relative; }
+  #canvas3d { width: 100%; height: 360px; border-radius: 10px;
+    border: 1px solid var(--border); overflow: hidden; background: var(--code-bg); position: relative; }
+  .viewer-controls { position: absolute; top: 12px; right: 12px;
+    background: rgba(22, 26, 34, 0.85); border: 1px solid var(--border);
+    backdrop-filter: blur(8px); border-radius: 8px; padding: 10px 12px;
+    display: flex; flex-direction: column; gap: 8px; min-width: 200px; }
+  .fn-buttons { display: grid; grid-template-columns: repeat(2, 1fr); gap: 4px; }
+  .fn-buttons button { background: var(--panel-2); color: var(--text); border: 1px solid var(--border);
+    padding: 5px 8px; border-radius: 4px; font-size: 0.78rem; cursor: pointer;
+    font-family: inherit; transition: all 0.15s; }
+  .fn-buttons button:hover { border-color: var(--accent); }
+  .fn-buttons button.active { background: var(--accent); color: var(--bg);
+    border-color: var(--accent); font-weight: 600; }
+  .toggles { display: flex; flex-direction: column; gap: 4px; padding-top: 8px;
+    border-top: 1px solid var(--border); font-size: 0.78rem; color: var(--muted); }
+  .toggles label { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+  .toggles input { accent-color: var(--accent); }
+  /* Floor info readout */
+  .info-readout { position: absolute; bottom: 12px; left: 12px;
+    background: rgba(22, 26, 34, 0.85); border: 1px solid var(--border);
+    backdrop-filter: blur(8px); border-radius: 6px; padding: 6px 10px;
+    font-size: 0.78rem; font-family: ui-monospace, monospace; color: var(--muted); }
+  /* Tier progression */
+  .tier-progression { display: grid; gap: 12px; margin: 16px 0; }
+  .tier { background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+    padding: 16px 18px; border-left-width: 4px; }
+  .tier.t1 { border-left-color: var(--t1); }
+  .tier.t2 { border-left-color: var(--t2); }
+  .tier.t3 { border-left-color: var(--t3); }
+  .tier.t4 { border-left-color: var(--t4); }
+  .tier.t5 { border-left-color: var(--t5); }
+  .tier .tier-label { display: inline-block; font-size: 0.72rem; padding: 2px 8px;
+    border-radius: 4px; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 600;
+    margin-bottom: 8px; }
+  .tier.t1 .tier-label { color: var(--t1); background: rgba(102, 211, 168, 0.12); }
+  .tier.t2 .tier-label { color: var(--t2); background: rgba(122, 162, 255, 0.12); }
+  .tier.t3 .tier-label { color: var(--t3); background: rgba(192, 132, 252, 0.12); }
+  .tier.t4 .tier-label { color: var(--t4); background: rgba(255, 184, 107, 0.12); }
+  .tier.t5 .tier-label { color: var(--t5); background: rgba(255, 107, 107, 0.12); }
+  .tier h3 { margin: 0 0 8px; }
+  .tier p { margin: 8px 0; }
+  /* Pros / Cons */
+  .proscons { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin: 16px 0; }
+  @media (max-width: 700px) { .proscons { grid-template-columns: 1fr; } }
+  .proscons > div { background: var(--panel); border: 1px solid var(--border); border-radius: 8px;
+    padding: 12px 16px; }
+  .pros h4 { color: var(--accent-2); margin: 0 0 8px; }
+  .cons h4 { color: var(--danger); margin: 0 0 8px; }
+  .proscons ul { margin: 0; padding-left: 18px; font-size: 0.92rem; }
+  .proscons li { margin: 3px 0; }
+  /* Comparison table */
+  .compare-table { width: 100%; border-collapse: collapse; font-size: 0.86rem;
+    background: var(--panel); border-radius: 10px; overflow: hidden; }
+  .compare-table th, .compare-table td { padding: 8px 10px; text-align: left;
+    border-bottom: 1px solid var(--border); }
+  .compare-table th { background: var(--panel-2); color: var(--muted);
+    text-transform: uppercase; font-size: 0.72rem; letter-spacing: 0.06em; font-weight: 500; }
+  .compare-table tr:last-child td { border-bottom: none; }
+  .compare-table .fn { font-family: ui-monospace, monospace; color: var(--accent-2); font-weight: 600; }
+  .compare-table .range { font-family: ui-monospace, monospace; color: var(--muted); font-size: 0.82rem; }
+  /* Range slider for softmax */
+  .softmax-card { background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 14px 18px; margin: 14px 0; }
+  .softmax-bars { display: flex; align-items: flex-end; height: 120px; gap: 10px;
+    margin-top: 14px; padding: 10px; background: var(--code-bg); border-radius: 6px; }
+  .softmax-bar { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; }
+  .softmax-bar .bar-fill { width: 70%; background: var(--accent); border-radius: 4px 4px 0 0;
+    min-height: 4px; transition: height 0.2s; }
+  .softmax-bar .bar-label { font-family: ui-monospace, monospace; font-size: 0.8rem;
+    color: var(--muted); margin-top: 4px; }
+  .softmax-bar .bar-value { font-family: ui-monospace, monospace; font-size: 0.78rem;
+    color: var(--accent-2); margin-bottom: 4px; }
+  .softmax-controls { display: flex; gap: 14px; margin: 10px 0; }
+  .softmax-controls label { display: flex; flex-direction: column; gap: 4px;
+    font-size: 0.82rem; color: var(--muted); flex: 1; }
+  .softmax-controls input[type=range] { accent-color: var(--accent); }
+  .softmax-controls .val { font-family: ui-monospace, monospace; color: var(--text); }
+  /* Misc */
+  hr { border: none; border-top: 1px solid var(--border); margin: 30px 0; }
+  blockquote { border-left: 3px solid var(--accent); padding: 8px 16px; margin: 14px 0;
+    background: var(--panel); border-radius: 0 6px 6px 0; color: var(--text); font-style: italic; }
+  .key-takeaway { background: var(--panel-2); border-left: 3px solid var(--accent-2);
+    padding: 12px 16px; margin: 14px 0; border-radius: 0 6px 6px 0; }
+  .key-takeaway::before { content: "Key takeaway"; display: block; font-size: 0.74rem;
+    color: var(--accent-2); text-transform: uppercase; letter-spacing: 0.08em;
+    margin-bottom: 6px; font-weight: 600; }
+  @media (max-width: 900px) {
+    .app { grid-template-columns: 1fr; }
+    .sidebar { position: relative; height: auto; }
+    main { padding: 24px 20px 60px; }
+    .viewer-card { margin: -24px -20px 20px; padding: 12px 20px; }
+    .viewer-controls { position: relative; top: auto; right: auto; margin-top: 10px; }
+  }
+</style>
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+</head>
+<body>
+<div class="app">
+  <aside class="sidebar">
+    <a class="back" href="index.html">← back to main path</a>
+    <h1>Activation Functions</h1>
+    <nav>
+      <a href="#intro">What is an activation function?</a>
+      <a href="#why">Why we need them</a>
+      <a class="section">Functions (in order)</a>
+      <a href="#step">Step (historical)</a>
+      <a href="#sigmoid">Sigmoid</a>
+      <a href="#tanh">Tanh</a>
+      <a href="#relu">ReLU</a>
+      <a href="#leakyrelu">Leaky ReLU</a>
+      <a href="#gelu">GELU</a>
+      <a href="#silu">SiLU / Swish</a>
+      <a href="#softmax">Softmax</a>
+      <a class="section">Reference</a>
+      <a href="#compare">Side-by-side compare</a>
+      <a href="#decide">How to pick</a>
+    </nav>
+  </aside>
+
+  <main>
+    <h1>Activation Functions — a 3D Tour</h1>
+    <p class="muted">Every neural network is a stack of linear transformations interrupted by <em>nonlinearities</em>. Without those nonlinearities, no matter how deep your network is, the whole thing collapses into a single linear function. The activation function is the nonlinearity. This page explains them in five levels, from layman to mathematical.</p>
+
+    <div class="viewer-card">
+      <div class="viewer-header">
+        <div class="fn-name" id="fn-name">ReLU</div>
+        <div class="fn-formula" id="fn-formula">f(x) = max(0, x)</div>
+      </div>
+      <div class="canvas-wrap">
+        <div id="canvas3d"></div>
+        <div class="viewer-controls">
+          <div class="fn-buttons" id="fn-buttons">
+            <button data-fn="step">Step</button>
+            <button data-fn="sigmoid">Sigmoid</button>
+            <button data-fn="tanh">Tanh</button>
+            <button data-fn="relu" class="active">ReLU</button>
+            <button data-fn="leakyrelu">Leaky ReLU</button>
+            <button data-fn="gelu">GELU</button>
+            <button data-fn="silu">SiLU</button>
+            <button data-fn="softmax">Softmax</button>
+          </div>
+          <div class="toggles">
+            <label><input type="checkbox" id="show-deriv" checked> show derivative</label>
+            <label><input type="checkbox" id="show-particles" checked> animate data flow</label>
+            <label><input type="checkbox" id="auto-rotate"> auto-rotate</label>
+          </div>
+        </div>
+        <div class="info-readout" id="info-readout">drag to rotate · scroll to zoom</div>
+      </div>
+    </div>
+
+    <section id="intro">
+      <h2>What is an activation function? <span class="badge">tier 1 · layman</span></h2>
+      <p>Imagine a neuron is a person making a yes/no decision. They get information (numbers) coming in, weigh how important each piece is, add them up, and then have to <strong>decide</strong> what to do. The activation function is that decision step.</p>
+      <p>In the most extreme case, the decision is binary: "is the total above some threshold? Then say yes (1). Otherwise say no (0)." That's the original activation function — the <strong>step function</strong>. But it has a problem: there's no in-between, no "kind of." In a world of grey, this person can only answer in absolutes.</p>
+      <p>Modern activation functions are <em>smoother decisions</em>. They take a continuous number in and produce a transformed number out. The shape of that transformation is what makes a network capable of learning anything interesting.</p>
+
+      <div class="key-takeaway">
+        An activation function takes one number, applies some non-linear shape to it, and returns one number. It's the "decision style" of every neuron in the network. The shape you pick has huge consequences for whether the network can learn.
+      </div>
+    </section>
+
+    <section id="why">
+      <h2>Why we need them <span class="badge">tier 2 · the problem</span></h2>
+      <p>A neural network without activation functions is mathematically the same as a single linear equation, no matter how many layers it has. Here's the trap:</p>
+<pre><code>Layer 1: y₁ = W₁ · x + b₁
+Layer 2: y₂ = W₂ · y₁ + b₂ = W₂(W₁x + b₁) + b₂
+             = (W₂W₁) · x + (W₂b₁ + b₂)
+                ↑ this is just another linear layer.</code></pre>
+      <p>Stack 100 layers without nonlinearities and you still have something equivalent to <em>one</em> linear layer. You can only draw straight lines through your data. You cannot learn to recognize a cat, predict the next word, or anything else interesting.</p>
+      <p>The activation function breaks this collapse. By applying a non-linear function between layers, you give the network the ability to bend, fold, and reshape its input space — which is what's needed to learn anything beyond linear regression.</p>
+      <p>Look at the 3D viewer above. Watch what the function does to the orange particles flowing in along the x-axis: it bends them, clips them, smooths them. <strong>That bending is what makes deep learning possible.</strong></p>
+    </section>
+
+    <!-- ====================== STEP ====================== -->
+    <section id="step">
+      <h2>1. Step function (historical) <span class="badge">where it all started</span></h2>
+      <p class="muted">Open the 3D viewer above and click <strong>Step</strong>.</p>
+
+      <div class="tier-progression">
+        <div class="tier t1">
+          <span class="tier-label">Tier 1 · Layman</span>
+          <h3>The light switch</h3>
+          <p>This is the simplest decision rule in the world: a light switch. Is the input above zero? Output is 1 (on). Below zero? Output is 0 (off). No gradations, no "maybe," no shades of grey.</p>
+        </div>
+        <div class="tier t2">
+          <span class="tier-label">Tier 2 · The problem it solves</span>
+          <h3>Modeling a biological neuron</h3>
+          <p>McCulloch and Pitts proposed this in 1943, decades before backpropagation. Biological neurons fire in discrete spikes — either they fire or they don't. The step function was the natural mathematical model. The 1957 Perceptron (Rosenblatt) used this activation and was the first machine learning model trained on real data.</p>
+        </div>
+        <div class="tier t3">
+          <span class="tier-label">Tier 3 · Visual intuition</span>
+          <h3>A perfect cliff at zero</h3>
+          <p>Imagine a flat plane at height 0 stretching to the left, then at exactly x=0, a vertical wall jumping straight up to height 1, then continuing flat at height 1 forever to the right. No curve, just two horizontal lines connected by a vertical jump.</p>
+        </div>
+        <div class="tier t4">
+          <span class="tier-label">Tier 4 · Mathematical</span>
+          <h3>f(x) = 1 if x ≥ 0 else 0</h3>
+          <p>Also known as the <strong>Heaviside step function</strong>. It's piecewise constant — it equals 1 for all non-negative inputs and 0 for all negative inputs.</p>
+        </div>
+        <div class="tier t5">
+          <span class="tier-label">Tier 5 · Advanced (why we don't use it anymore)</span>
+          <h3>The killer: zero derivative</h3>
+          <p>The derivative is 0 everywhere except at x=0, where it's technically undefined (you can think of it as a Dirac delta with infinite slope). For gradient descent, this is catastrophic — if your gradient is 0 everywhere, there's no information about which direction to update weights. The step function is a dead end for learning by backpropagation.</p>
+          <p class="muted">The Perceptron got around this by training with a non-gradient-based rule. But once backprop became the standard, step functions disappeared from the lineup.</p>
+        </div>
+      </div>
+
+      <div class="proscons">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Conceptually simple — yes or no</li>
+            <li>Computationally trivial (one comparison)</li>
+            <li>Biologically plausible</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li><strong>Zero gradient everywhere</strong> — fatal for backprop</li>
+            <li>Not differentiable at x=0</li>
+            <li>Loses all magnitude information (1 vs 1000 → same output)</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================== SIGMOID ====================== -->
+    <section id="sigmoid">
+      <h2>2. Sigmoid <span class="badge">the smooth yes/no</span></h2>
+
+      <div class="tier-progression">
+        <div class="tier t1">
+          <span class="tier-label">Tier 1 · Layman</span>
+          <h3>"How confident are you?" (0% to 100%)</h3>
+          <p>Instead of a hard yes or no, sigmoid gives you a confidence percentage. Big positive number going in? "I'm very confident, like 99%." Big negative? "Very unlikely, 1%." Right around zero? "Honestly, 50/50."</p>
+          <p>It's the soft version of the light switch — a dimmer that smoothly transitions from off to on as you turn the knob.</p>
+        </div>
+        <div class="tier t2">
+          <span class="tier-label">Tier 2 · The problem it solves</span>
+          <h3>Making learning differentiable</h3>
+          <p>The step function couldn't be trained with gradient descent because its derivative was zero everywhere. Sigmoid solved that by being a <em>smooth</em> S-curve — at every point, you can compute "if I nudge x a little, how much does the output change?" That tiny piece of information is what lets gradient descent work.</p>
+          <p>It also has a beautiful property: its output is always between 0 and 1, so it can be interpreted as a probability. For decades (1980s-2010), sigmoid was the default activation in neural networks.</p>
+        </div>
+        <div class="tier t3">
+          <span class="tier-label">Tier 3 · Visual intuition</span>
+          <h3>An S-curve hugged between 0 and 1</h3>
+          <p>The curve is dead flat near 0 on the left side (large negative inputs), shoots up sharply through the middle (around x=0, the output is 0.5), then flattens out again near 1 on the right side. The steepest part of the slope is right at x=0.</p>
+          <p>Look at the 3D viewer with sigmoid selected. Notice the particles getting compressed into a narrow band between 0 and 1 — that's the squashing effect.</p>
+        </div>
+        <div class="tier t4">
+          <span class="tier-label">Tier 4 · Mathematical</span>
+          <h3>σ(x) = 1 / (1 + e⁻ˣ)</h3>
+          <p>Equivalent forms:</p>
+<pre><code>σ(x) = 1 / (1 + e⁻ˣ)            # standard form
+     = eˣ / (1 + eˣ)            # multiply top and bottom by eˣ
+     = (1 + tanh(x/2)) / 2      # related to tanh by a shift+scale</code></pre>
+          <p>σ(0) = 0.5. As x → +∞, σ(x) → 1. As x → −∞, σ(x) → 0. Always strictly between 0 and 1.</p>
+        </div>
+        <div class="tier t5">
+          <span class="tier-label">Tier 5 · Advanced (the vanishing gradient story)</span>
+          <h3>σ'(x) = σ(x) · (1 − σ(x))</h3>
+          <p>Beautiful closed form, but here's the killer: the maximum value of this derivative is exactly <strong>0.25</strong>, occurring at x=0. As x moves away from zero in either direction, the derivative falls toward 0.</p>
+          <p>That means every sigmoid layer multiplies your gradient by at most 0.25. Stack 10 sigmoid layers and your gradient signal becomes <code>(0.25)¹⁰ ≈ 1e-6</code>. The deepest layers in a sigmoid network barely learn anything — the gradient signal has vanished by the time it gets to them. This is the <strong>vanishing gradient problem</strong>, the central reason deep networks didn't work pre-2010.</p>
+          <p class="muted">Sigmoid is still used today, but only at output layers (binary classification) — never as the hidden-layer activation in deep networks.</p>
+        </div>
+      </div>
+
+      <div class="proscons">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Smooth, fully differentiable</li>
+            <li>Output ∈ (0, 1) — usable as probability</li>
+            <li>Mathematically elegant derivative</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li><strong>Vanishing gradients</strong> — max derivative is just 0.25</li>
+            <li>Not zero-centered — outputs always positive</li>
+            <li>Saturates: huge inputs give nearly identical outputs</li>
+            <li>Exponential is more expensive than ReLU</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================== TANH ====================== -->
+    <section id="tanh">
+      <h2>3. Tanh <span class="badge">sigmoid's zero-centered cousin</span></h2>
+
+      <div class="tier-progression">
+        <div class="tier t1">
+          <span class="tier-label">Tier 1 · Layman</span>
+          <h3>Sigmoid, but it can also say "no"</h3>
+          <p>Sigmoid only ever outputs positive numbers (between 0 and 1). Tanh is the same S-shape, but it's centered around zero — so it can say "negative" or "positive" with equal force. Outputs range from -1 to +1.</p>
+        </div>
+        <div class="tier t2">
+          <span class="tier-label">Tier 2 · The problem it solves</span>
+          <h3>"Zero-centered" matters for training</h3>
+          <p>Because sigmoid outputs are always positive, the gradients flowing back through a layer of sigmoid neurons are always in the same direction (all positive or all negative) — which forces zig-zag updates and slows training. Tanh outputs can be either sign, so the gradients are zero-centered too. Training tends to be a bit faster, and was the standard choice for RNNs (LSTMs, GRUs) before ReLU dominance.</p>
+        </div>
+        <div class="tier t3">
+          <span class="tier-label">Tier 3 · Visual intuition</span>
+          <h3>S-shape, but symmetric around (0, 0)</h3>
+          <p>The curve passes through the origin. Far to the left, it asymptotes to -1; far to the right, it asymptotes to +1. The steepest slope is at x=0, just like sigmoid.</p>
+        </div>
+        <div class="tier t4">
+          <span class="tier-label">Tier 4 · Mathematical</span>
+          <h3>tanh(x) = (eˣ − e⁻ˣ) / (eˣ + e⁻ˣ)</h3>
+<pre><code>tanh(x) = 2·σ(2x) − 1           # tanh is literally a rescaled sigmoid
+        = sinh(x) / cosh(x)     # ratio of hyperbolic sin/cos</code></pre>
+          <p>tanh(0) = 0. tanh(±∞) = ±1.</p>
+        </div>
+        <div class="tier t5">
+          <span class="tier-label">Tier 5 · Advanced</span>
+          <h3>tanh'(x) = 1 − tanh²(x)</h3>
+          <p>Maximum derivative is <strong>1.0</strong> at x=0 — four times better than sigmoid's 0.25. So vanishing gradients are less severe than with sigmoid, but still a problem in deep networks: tanh still saturates for large |x|.</p>
+          <p>Tanh used to be the default activation in RNNs (LSTM, GRU) and is still used inside their gating mechanisms. For feedforward layers, ReLU and its variants have largely replaced it.</p>
+        </div>
+      </div>
+
+      <div class="proscons">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Zero-centered output (range -1 to 1)</li>
+            <li>Better max gradient than sigmoid (1.0 vs 0.25)</li>
+            <li>Smooth and differentiable everywhere</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>Still saturates at extreme inputs</li>
+            <li>Still suffers vanishing gradient (just less than sigmoid)</li>
+            <li>Exponential is expensive vs ReLU</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================== RELU ====================== -->
+    <section id="relu">
+      <h2>4. ReLU <span class="badge">the breakthrough · 2010</span></h2>
+
+      <div class="tier-progression">
+        <div class="tier t1">
+          <span class="tier-label">Tier 1 · Layman</span>
+          <h3>The one-way valve</h3>
+          <p>Imagine a one-way water valve. Water flowing in the positive direction? Passes through freely, unchanged. Water trying to flow backward (negative)? Blocked completely.</p>
+          <p>ReLU does this for numbers. Positive inputs pass through as-is. Negative inputs become exactly zero. That's the whole activation function.</p>
+        </div>
+        <div class="tier t2">
+          <span class="tier-label">Tier 2 · The problem it solves</span>
+          <h3>It made deep networks actually train</h3>
+          <p>For 20+ years, deep neural networks "couldn't work" — they'd stop improving past 4-5 layers because of the vanishing gradient problem (sigmoid and tanh both saturate). In 2010, researchers showed that ReLU's gradient is exactly <strong>1</strong> for positive inputs, so it doesn't shrink as you stack layers.</p>
+          <p>This single change — replacing sigmoid with ReLU — is what made AlexNet (2012) possible, which kicked off the deep learning revolution. Almost every modern network uses ReLU or one of its derivatives.</p>
+        </div>
+        <div class="tier t3">
+          <span class="tier-label">Tier 3 · Visual intuition</span>
+          <h3>Two straight lines meeting at the origin</h3>
+          <p>To the left of zero: a flat floor at height 0. To the right of zero: a 45-degree ramp going up at slope 1. They meet at a sharp corner at the origin. That's it.</p>
+          <p>In the 3D viewer with ReLU selected, notice how all the particles to the left of zero get squished onto the floor (y=0), while particles to the right ride up the ramp unchanged.</p>
+        </div>
+        <div class="tier t4">
+          <span class="tier-label">Tier 4 · Mathematical</span>
+          <h3>f(x) = max(0, x)</h3>
+          <p>One comparison. No exponentials, no division. ReLU is also the cheapest activation to compute — a single conditional.</p>
+<pre><code>def relu(x):
+    return max(0, x)
+# or for tensors:
+def relu(x):
+    return torch.clamp(x, min=0)</code></pre>
+        </div>
+        <div class="tier t5">
+          <span class="tier-label">Tier 5 · Advanced (the dying ReLU problem)</span>
+          <h3>f'(x) = 1 if x > 0 else 0</h3>
+          <p>The derivative is a step function — 1 for positive, 0 for negative. Technically undefined at exactly x=0 but PyTorch just picks 0 there.</p>
+          <p><strong>The "dying ReLU" problem</strong>: if a neuron's pre-activation drifts permanently negative (e.g., from one bad gradient update that pushed weights too far), its gradient becomes 0 forever. The neuron stops learning, stops contributing, and is effectively dead. In some networks, 20-40% of ReLU neurons can be "dead" by the end of training.</p>
+          <p>Symptoms in your training:</p>
+          <ul>
+            <li>Whole channels of activations frozen at 0 for all inputs</li>
+            <li>Loss plateaus surprisingly</li>
+            <li>Lowering the learning rate sometimes helps</li>
+          </ul>
+          <p class="muted">Fixes: Leaky ReLU, ELU, GELU, careful initialization (Kaiming/He init was designed for ReLU).</p>
+        </div>
+      </div>
+
+      <div class="proscons">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li><strong>Cheapest activation possible</strong> — one comparison</li>
+            <li>No vanishing gradient for positive inputs</li>
+            <li>Sparse activations (many neurons output exactly 0)</li>
+            <li>Single-handedly enabled deep learning</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li><strong>Dying ReLU</strong> — dead neurons never recover</li>
+            <li>Not zero-centered (outputs ≥ 0)</li>
+            <li>Non-differentiable at x=0 (small practical issue)</li>
+            <li>Unbounded above (exploding activations possible)</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================== LEAKY RELU ====================== -->
+    <section id="leakyrelu">
+      <h2>5. Leaky ReLU <span class="badge">ReLU with a tiny leak</span></h2>
+
+      <div class="tier-progression">
+        <div class="tier t1">
+          <span class="tier-label">Tier 1 · Layman</span>
+          <h3>The one-way valve, but a little water seeps through</h3>
+          <p>ReLU was a perfect valve — blocks negative completely. Leaky ReLU is a slightly imperfect valve: most of the time it blocks negatives, but a tiny amount still leaks through. Specifically, negative inputs get multiplied by 0.01 instead of being killed outright.</p>
+        </div>
+        <div class="tier t2">
+          <span class="tier-label">Tier 2 · The problem it solves</span>
+          <h3>Fixes "dying ReLU"</h3>
+          <p>The problem with vanilla ReLU is that dead neurons stay dead — once a neuron's pre-activation is negative, its gradient is 0, and it can't recover. Leaky ReLU has a small but non-zero gradient (typically α=0.01) for negative inputs, so dead neurons can still receive a learning signal and potentially come back to life.</p>
+        </div>
+        <div class="tier t3">
+          <span class="tier-label">Tier 3 · Visual intuition</span>
+          <h3>Two lines still, but the left one has a very gentle upward slope</h3>
+          <p>Same as ReLU on the positive side. On the negative side, instead of being flat at zero, the line slopes upward very gently (slope 0.01 instead of 0). Visually almost indistinguishable from ReLU unless you zoom way in.</p>
+        </div>
+        <div class="tier t4">
+          <span class="tier-label">Tier 4 · Mathematical</span>
+          <h3>f(x) = max(α·x, x), with α ≈ 0.01</h3>
+          <p>Equivalent piecewise form:</p>
+<pre><code>f(x) = x          if x > 0
+     = α·x        if x ≤ 0      (α typically 0.01)</code></pre>
+          <p>Variants:</p>
+          <ul>
+            <li><strong>PReLU</strong> (Parametric ReLU): α is a learned parameter per channel, not a fixed constant.</li>
+            <li><strong>RReLU</strong> (Randomized): α is sampled uniformly from some range during training (acts as regularization).</li>
+          </ul>
+        </div>
+        <div class="tier t5">
+          <span class="tier-label">Tier 5 · Advanced</span>
+          <h3>f'(x) = 1 if x > 0 else α</h3>
+          <p>The derivative is α for negative inputs instead of 0. No dead neurons.</p>
+          <p>The empirical gain over ReLU is small — often less than 1% improvement on standard benchmarks. The reasoning is that in modern architectures with careful initialization (Kaiming init), batch normalization, and skip connections, dying ReLU is less of a concern. But on small networks or those without batch norm, Leaky ReLU is a cheap insurance policy.</p>
+        </div>
+      </div>
+
+      <div class="proscons">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Eliminates dying ReLU problem</li>
+            <li>Still very cheap (one comparison + multiply)</li>
+            <li>Non-zero gradient everywhere</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>α is an extra hyperparameter to set</li>
+            <li>Empirical gain over ReLU is small (~0.5-1%)</li>
+            <li>Still not zero-centered</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================== GELU ====================== -->
+    <section id="gelu">
+      <h2>6. GELU <span class="badge">the transformer default</span></h2>
+
+      <div class="tier-progression">
+        <div class="tier t1">
+          <span class="tier-label">Tier 1 · Layman</span>
+          <h3>ReLU's smoother, smarter cousin</h3>
+          <p>ReLU has a hard corner at zero — abruptly switching from "pass through" to "completely block." GELU smooths that corner. Instead of a sharp cliff, it's a gentle curve. Small negative values aren't completely killed; they're just heavily reduced. Most of the same benefits, none of the dying-neuron sharpness.</p>
+        </div>
+        <div class="tier t2">
+          <span class="tier-label">Tier 2 · The problem it solves</span>
+          <h3>Better gradients for transformers</h3>
+          <p>The sharp corner of ReLU creates discontinuous gradients (1 vs 0 with no gradient transition). Empirically, transformers (BERT, GPT, LLaMA, modern image transformers) train better with smooth activations. GELU is the dominant choice. Modern image diffusion models and most ViT-style architectures use GELU.</p>
+          <p>It also has a probabilistic interpretation: GELU is essentially "multiply your input by the probability that the input is positive under a standard normal distribution" — a kind of stochastic-but-deterministic gating.</p>
+        </div>
+        <div class="tier t3">
+          <span class="tier-label">Tier 3 · Visual intuition</span>
+          <h3>Like ReLU, but with the corner softened into a curve</h3>
+          <p>For large positive x, GELU looks just like a 45-degree line (same as ReLU). For large negative x, GELU is essentially zero. The interesting part is the middle: a smooth S-shaped curve that briefly dips below zero around x ≈ -1 before approaching zero asymptotically.</p>
+          <p>That tiny dip — outputs going slightly negative for some negative inputs — is a key difference from ReLU.</p>
+        </div>
+        <div class="tier t4">
+          <span class="tier-label">Tier 4 · Mathematical</span>
+          <h3>f(x) = x · Φ(x)</h3>
+          <p>Where Φ is the <strong>cumulative distribution function</strong> of the standard normal distribution. In plain English: f(x) is the input x multiplied by "the probability that a random standard-normal sample is less than x."</p>
+          <p>Practical implementations use a tanh-based approximation that's much faster to compute:</p>
+<pre><code>GELU(x) ≈ x · 0.5 · (1 + tanh(√(2/π) · (x + 0.044715·x³)))
+        ≈ x · σ(1.702·x)                  # cheaper sigmoid approximation</code></pre>
+          <p>PyTorch's <code>F.gelu()</code> uses one of these — choose 'tanh' or 'none' approximation.</p>
+        </div>
+        <div class="tier t5">
+          <span class="tier-label">Tier 5 · Advanced</span>
+          <h3>Why GELU dominates in transformers</h3>
+          <p>The derivative is messy but always well-defined — no discontinuities. Combined with the smooth curve, this means:</p>
+          <ul>
+            <li><strong>No dead neurons</strong>: negative inputs still produce small non-zero gradients</li>
+            <li><strong>Better optimization landscape</strong>: smoother gradients lead to smoother loss surfaces</li>
+            <li><strong>Self-gating interpretation</strong>: f(x) = x · Φ(x) is like ReLU but with a probabilistic "gate" instead of a hard cutoff</li>
+          </ul>
+          <p class="muted">GELU is the default in BERT, GPT-2/3, LLaMA-family, ViT, DiT (the architecture you'll build in Phase 3). When in doubt for a transformer-style model, use GELU.</p>
+        </div>
+      </div>
+
+      <div class="proscons">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Smooth everywhere — no dead neurons</li>
+            <li>Empirically beats ReLU on language tasks</li>
+            <li>Probabilistic interpretation</li>
+            <li>The de-facto choice for transformers</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>~2-3× more expensive than ReLU</li>
+            <li>Formula is more complex (multiple variants)</li>
+            <li>Marginal gain on CNN-style tasks</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================== SILU / SWISH ====================== -->
+    <section id="silu">
+      <h2>7. SiLU / Swish <span class="badge">used in LLaMA, modern image gen</span></h2>
+
+      <div class="tier-progression">
+        <div class="tier t1">
+          <span class="tier-label">Tier 1 · Layman</span>
+          <h3>"x times its own confidence"</h3>
+          <p>SiLU (also called Swish) is the input multiplied by its own sigmoid. In plain terms: "look at the input, decide how confident you are that it's positive (using sigmoid), then output the input scaled by that confidence." Big positive → high confidence → passes through. Big negative → low confidence → near zero.</p>
+        </div>
+        <div class="tier t2">
+          <span class="tier-label">Tier 2 · The problem it solves</span>
+          <h3>A simpler GELU that works just as well</h3>
+          <p>Discovered via neural architecture search by Google in 2017 (originally "Swish"; later renamed SiLU for "Sigmoid Linear Unit"). It performs comparably to GELU but is cheaper to compute. Used heavily in modern open-source LLMs (LLaMA family), Stable Diffusion's U-Net, and recent ViT variants.</p>
+        </div>
+        <div class="tier t3">
+          <span class="tier-label">Tier 3 · Visual intuition</span>
+          <h3>Looks like GELU, with a slightly deeper dip</h3>
+          <p>For large positive x, behaves like a 45-degree line. For large negative x, approaches zero. Between, there's a smooth curve with a small dip below zero around x ≈ -1.3 (where it has its global minimum of about -0.28).</p>
+        </div>
+        <div class="tier t4">
+          <span class="tier-label">Tier 4 · Mathematical</span>
+          <h3>f(x) = x · σ(x) = x / (1 + e⁻ˣ)</h3>
+          <p>That's it. Just sigmoid multiplied by the input. Notice it's strictly cheaper than GELU's tanh-based approximation: one exponential vs three multiplications and a tanh.</p>
+          <p>A parametric version, <strong>Swish-β</strong>, has f(x) = x · σ(β·x) where β is learnable. β=1 (the default) gives SiLU; β=0 gives a linear function; large β approaches ReLU.</p>
+        </div>
+        <div class="tier t5">
+          <span class="tier-label">Tier 5 · Advanced</span>
+          <h3>f'(x) = σ(x) + x · σ(x) · (1 − σ(x))</h3>
+          <p>Can be rewritten as <code>f'(x) = σ(x) · (1 + x · (1 − σ(x)))</code>, which is computed efficiently.</p>
+          <p>The "self-gating" property — input scaled by its own sigmoid — empirically gives smoother gradient flow than ReLU. In transformers like LLaMA, SiLU is used inside the SwiGLU MLP variant: <code>SwiGLU(x) = SiLU(W₁x) ⊙ (W₂x)</code> — a gated linear unit with SiLU as the gate.</p>
+          <p class="muted">Bottom line: SiLU is "GELU but cheaper, with nearly identical performance." When you're building modern LLMs or image generators, this is the standard choice in 2026.</p>
+        </div>
+      </div>
+
+      <div class="proscons">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Cheaper than GELU (single exp instead of three multiplies + tanh)</li>
+            <li>Performs comparably to GELU on most tasks</li>
+            <li>Smooth, no dead neurons</li>
+            <li>Used in LLaMA, Stable Diffusion, modern ViT</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>Slightly more expensive than ReLU</li>
+            <li>Marginal gain over GELU is small</li>
+            <li>Less interpretable than ReLU's "valve" mental model</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================== SOFTMAX ====================== -->
+    <section id="softmax">
+      <h2>8. Softmax <span class="badge">the output-layer specialist</span></h2>
+
+      <div class="tier-progression">
+        <div class="tier t1">
+          <span class="tier-label">Tier 1 · Layman</span>
+          <h3>"Force these scores into percentages that sum to 100%"</h3>
+          <p>Different from the others — Softmax takes a whole <em>vector</em> of scores and turns them into probabilities. If a network outputs scores [3.0, 1.0, 0.5] for three classes ("cat", "dog", "fish"), softmax will turn them into something like [0.78, 0.13, 0.09] — three numbers that sum to 1 and can be read as "78% cat, 13% dog, 9% fish."</p>
+        </div>
+        <div class="tier t2">
+          <span class="tier-label">Tier 2 · The problem it solves</span>
+          <h3>Multi-class probabilities at the output</h3>
+          <p>For a classifier with K classes, you need K outputs that:</p>
+          <ul>
+            <li>Are all non-negative (probabilities)</li>
+            <li>Sum to exactly 1 (one of the classes is correct)</li>
+            <li>Reflect the relative confidence between classes</li>
+          </ul>
+          <p>Softmax does this. It exponentiates each score (making them all positive) and then divides each by the sum (forcing them to sum to 1). The larger a score, the more it dominates after exponentiation — which is why softmax is "soft argmax": it's a smooth differentiable version of "pick the largest."</p>
+        </div>
+        <div class="tier t3">
+          <span class="tier-label">Tier 3 · Visual intuition (interactive)</span>
+          <h3>Three sliders → three bars</h3>
+          <p>Drag the sliders below to change three input scores. Watch how softmax converts them into probabilities. Notice: when scores are close, the probabilities are similar. When one score dominates, softmax becomes almost one-hot.</p>
+        </div>
+      </div>
+
+      <div class="softmax-card">
+        <div class="softmax-controls">
+          <label>
+            score x₁: <span class="val" id="sm-v1">2.0</span>
+            <input type="range" id="sm-x1" min="-3" max="6" step="0.1" value="2.0">
+          </label>
+          <label>
+            score x₂: <span class="val" id="sm-v2">1.0</span>
+            <input type="range" id="sm-x2" min="-3" max="6" step="0.1" value="1.0">
+          </label>
+          <label>
+            score x₃: <span class="val" id="sm-v3">0.5</span>
+            <input type="range" id="sm-x3" min="-3" max="6" step="0.1" value="0.5">
+          </label>
+        </div>
+        <div class="softmax-bars">
+          <div class="softmax-bar">
+            <div class="bar-value" id="sm-p1">0.78</div>
+            <div class="bar-fill" id="sm-bar1" style="height: 78%"></div>
+            <div class="bar-label">p(class 1)</div>
+          </div>
+          <div class="softmax-bar">
+            <div class="bar-value" id="sm-p2">0.13</div>
+            <div class="bar-fill" id="sm-bar2" style="height: 13%"></div>
+            <div class="bar-label">p(class 2)</div>
+          </div>
+          <div class="softmax-bar">
+            <div class="bar-value" id="sm-p3">0.09</div>
+            <div class="bar-fill" id="sm-bar3" style="height: 9%"></div>
+            <div class="bar-label">p(class 3)</div>
+          </div>
+        </div>
+        <p class="muted" style="margin-top: 10px; font-size: 0.86rem">Probabilities sum to <span id="sm-sum" style="color: var(--accent-2)">1.000</span> — always.</p>
+      </div>
+
+      <div class="tier-progression">
+        <div class="tier t4">
+          <span class="tier-label">Tier 4 · Mathematical</span>
+          <h3>softmax(x)ᵢ = eˣⁱ / Σⱼ eˣʲ</h3>
+          <p>For a vector x = [x₁, x₂, ..., xₖ]:</p>
+          <ol>
+            <li>Exponentiate each: [e^x₁, e^x₂, ..., e^xₖ]</li>
+            <li>Sum them: S = Σⱼ e^xⱼ</li>
+            <li>Divide each by S: probabilities = [e^x₁/S, e^x₂/S, ..., e^xₖ/S]</li>
+          </ol>
+          <p>Always sums to 1. Always positive. The output is a valid probability distribution.</p>
+        </div>
+        <div class="tier t5">
+          <span class="tier-label">Tier 5 · Advanced</span>
+          <h3>Numerical stability + cross-entropy</h3>
+          <p>The naive formula has a <strong>numerical stability problem</strong>: if any xᵢ is large (say 1000), then e^xᵢ overflows. The standard trick is to subtract the max before exponentiating:</p>
+<pre><code>m = max(x)
+softmax(x)ᵢ = e^(xᵢ − m) / Σⱼ e^(xⱼ − m)</code></pre>
+          <p>Mathematically identical (the m's cancel), but now the largest exponent is e^0 = 1, no overflow. PyTorch's <code>F.softmax()</code> does this automatically.</p>
+          <p><strong>The cross-entropy partnership</strong>: when paired with cross-entropy loss for classification, the combined gradient simplifies beautifully to <code>(predicted_probs − one_hot_target)</code>. This is why <code>nn.CrossEntropyLoss</code> in PyTorch expects <em>raw logits</em>, not softmax outputs — it computes softmax + log + cross-entropy in a numerically stable fused operation.</p>
+          <p class="muted"><strong>Common bug:</strong> applying softmax in your model AND using CrossEntropyLoss → double softmax → silently wrong training. Always pass raw logits to CrossEntropyLoss.</p>
+        </div>
+      </div>
+
+      <div class="proscons">
+        <div class="pros">
+          <h4>Pros</h4>
+          <ul>
+            <li>Produces a valid probability distribution</li>
+            <li>Differentiable everywhere</li>
+            <li>Pairs beautifully with cross-entropy loss</li>
+            <li>The de-facto choice for multi-class output</li>
+          </ul>
+        </div>
+        <div class="cons">
+          <h4>Cons</h4>
+          <ul>
+            <li>Computationally expensive at large vocab sizes (e.g., LLMs)</li>
+            <li>Needs the max-subtraction trick for numerical stability</li>
+            <li>Easy to misuse (double-softmax bug)</li>
+            <li>Only suitable as an output activation — not for hidden layers</li>
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- ====================== COMPARE ====================== -->
+    <section id="compare">
+      <h2>Side-by-side comparison <span class="badge">reference table</span></h2>
+      <table class="compare-table">
+        <thead>
+          <tr>
+            <th>Function</th>
+            <th>Formula</th>
+            <th>Range</th>
+            <th>Cost</th>
+            <th>Saturates?</th>
+            <th>Dead neurons?</th>
+            <th>Used in</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td class="fn">Step</td>
+            <td>1 if x ≥ 0 else 0</td>
+            <td class="range">{0, 1}</td>
+            <td>cheapest</td>
+            <td>yes (everywhere)</td>
+            <td>n/a</td>
+            <td>Perceptron 1957</td>
+          </tr>
+          <tr>
+            <td class="fn">Sigmoid</td>
+            <td>1 / (1 + e⁻ˣ)</td>
+            <td class="range">(0, 1)</td>
+            <td>medium (exp)</td>
+            <td>yes (severe)</td>
+            <td>no</td>
+            <td>old MLPs, binary classifier outputs</td>
+          </tr>
+          <tr>
+            <td class="fn">Tanh</td>
+            <td>(eˣ−e⁻ˣ) / (eˣ+e⁻ˣ)</td>
+            <td class="range">(-1, 1)</td>
+            <td>medium (exp)</td>
+            <td>yes (moderate)</td>
+            <td>no</td>
+            <td>LSTMs, GRUs, RNNs</td>
+          </tr>
+          <tr>
+            <td class="fn">ReLU</td>
+            <td>max(0, x)</td>
+            <td class="range">[0, ∞)</td>
+            <td>cheapest</td>
+            <td>only on left</td>
+            <td><strong>yes (dying ReLU)</strong></td>
+            <td>CNNs (ResNet, etc.)</td>
+          </tr>
+          <tr>
+            <td class="fn">Leaky ReLU</td>
+            <td>max(αx, x), α=0.01</td>
+            <td class="range">(-∞, ∞)</td>
+            <td>cheapest</td>
+            <td>only on left (slight)</td>
+            <td>no</td>
+            <td>GANs, small CNNs</td>
+          </tr>
+          <tr>
+            <td class="fn">GELU</td>
+            <td>x · Φ(x)</td>
+            <td class="range">~(-0.17, ∞)</td>
+            <td>expensive</td>
+            <td>no</td>
+            <td>no</td>
+            <td>BERT, GPT, ViT, DiT</td>
+          </tr>
+          <tr>
+            <td class="fn">SiLU / Swish</td>
+            <td>x · σ(x)</td>
+            <td class="range">~(-0.28, ∞)</td>
+            <td>medium-expensive</td>
+            <td>no</td>
+            <td>no</td>
+            <td>LLaMA, Stable Diffusion, modern ViT</td>
+          </tr>
+          <tr>
+            <td class="fn">Softmax</td>
+            <td>eˣⁱ / Σⱼ eˣʲ</td>
+            <td class="range">(0, 1) per element; sum=1</td>
+            <td>expensive (per-vector)</td>
+            <td>no</td>
+            <td>no</td>
+            <td>multi-class output layer</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+
+    <!-- ====================== HOW TO PICK ====================== -->
+    <section id="decide">
+      <h2>How to pick (decision tree) <span class="badge">practical guide</span></h2>
+      <div class="key-takeaway">
+        <strong>Default rule for 2026:</strong> use GELU for transformers (NLP, ViT, DiT). Use SiLU for LLM-style models (LLaMA family) and modern image generators. Use ReLU for CNNs. Use Softmax only at multi-class output. Don't use sigmoid or tanh in hidden layers of deep networks.
+      </div>
+
+      <h3>By architecture</h3>
+      <ul>
+        <li><strong>Transformer (BERT, GPT, ViT, DiT)</strong>: GELU (default) or SiLU (in modern variants).</li>
+        <li><strong>LLM (LLaMA, Mistral)</strong>: SiLU, used in SwiGLU MLP layers.</li>
+        <li><strong>Diffusion model U-Net</strong>: SiLU. Inside DiT-style: GELU.</li>
+        <li><strong>Convolutional network (ResNet, etc.)</strong>: ReLU. Leaky ReLU if you suspect dying-neuron issues.</li>
+        <li><strong>GAN discriminator</strong>: Leaky ReLU (typical α=0.2 here, not 0.01).</li>
+        <li><strong>RNN / LSTM / GRU</strong>: Tanh inside the cell, sigmoid for gates (these are baked-in choices, not yours).</li>
+        <li><strong>Final output for binary classification</strong>: Sigmoid + BCEWithLogitsLoss (use the with-logits version).</li>
+        <li><strong>Final output for multi-class classification</strong>: Softmax — but pass raw logits to CrossEntropyLoss; don't apply softmax in the model.</li>
+        <li><strong>Final output for regression</strong>: no activation. Just a linear layer.</li>
+      </ul>
+
+      <h3>Common combinations that work well</h3>
+      <ul>
+        <li><strong>SwiGLU</strong> (in LLaMA): <code>SiLU(W₁x) ⊙ (W₂x)</code> — gated linear unit with SiLU as the gate. Standard in modern LLMs.</li>
+        <li><strong>GeGLU</strong>: <code>GELU(W₁x) ⊙ (W₂x)</code> — same idea with GELU.</li>
+        <li><strong>Mish</strong>: <code>x · tanh(softplus(x))</code> — niche but used in some CV work.</li>
+      </ul>
+
+      <hr />
+      <p class="muted">← <a href="index.html#c2">Back to Concept 2 (From neuron to MLP)</a> · <a href="index.html#c5">On to Concept 5 (Transformer block) →</a></p>
+    </section>
+  </main>
+</div>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+// =============================================================================
+// Activation function definitions
+// =============================================================================
+const ACTIVATIONS = {
+  step: {
+    name: 'Step (Heaviside)',
+    formula: 'f(x) = 1 if x ≥ 0 else 0',
+    fn: x => (x >= 0 ? 1 : 0),
+    deriv: x => 0,                              // 0 almost everywhere
+    color: 0x9aa3b2,
+    yRange: [-0.2, 1.5],
+  },
+  sigmoid: {
+    name: 'Sigmoid',
+    formula: 'σ(x) = 1 / (1 + e⁻ˣ)',
+    fn: x => 1 / (1 + Math.exp(-x)),
+    deriv: x => { const s = 1/(1+Math.exp(-x)); return s*(1-s); },
+    color: 0x7aa2ff,
+    yRange: [-0.2, 1.3],
+  },
+  tanh: {
+    name: 'Tanh',
+    formula: 'tanh(x) = (eˣ−e⁻ˣ) / (eˣ+e⁻ˣ)',
+    fn: x => Math.tanh(x),
+    deriv: x => 1 - Math.tanh(x) ** 2,
+    color: 0xc084fc,
+    yRange: [-1.5, 1.5],
+  },
+  relu: {
+    name: 'ReLU',
+    formula: 'f(x) = max(0, x)',
+    fn: x => Math.max(0, x),
+    deriv: x => (x > 0 ? 1 : 0),
+    color: 0x66d3a8,
+    yRange: [-0.5, 5],
+  },
+  leakyrelu: {
+    name: 'Leaky ReLU',
+    formula: 'f(x) = max(0.01x, x)',
+    fn: x => (x > 0 ? x : 0.01 * x),
+    deriv: x => (x > 0 ? 1 : 0.01),
+    color: 0xffb86b,
+    yRange: [-0.5, 5],
+  },
+  gelu: {
+    name: 'GELU',
+    formula: 'f(x) = x · Φ(x)',
+    fn: x => {
+      // tanh approximation (PyTorch's default)
+      const c = Math.sqrt(2 / Math.PI);
+      return 0.5 * x * (1 + Math.tanh(c * (x + 0.044715 * x ** 3)));
+    },
+    deriv: x => {
+      // numerical derivative — close enough for viz
+      const h = 1e-4;
+      const f = ACTIVATIONS.gelu.fn;
+      return (f(x + h) - f(x - h)) / (2 * h);
+    },
+    color: 0xff6b6b,
+    yRange: [-0.5, 5],
+  },
+  silu: {
+    name: 'SiLU / Swish',
+    formula: 'f(x) = x · σ(x)',
+    fn: x => x / (1 + Math.exp(-x)),
+    deriv: x => {
+      const s = 1 / (1 + Math.exp(-x));
+      return s + x * s * (1 - s);
+    },
+    color: 0x66d3a8,
+    yRange: [-0.5, 5],
+  },
+  softmax: {
+    name: 'Softmax (for K=2 → sigmoid of difference)',
+    formula: 'softmax(x)ᵢ = eˣⁱ / Σⱼ eˣʲ',
+    // For K=2 with input [x, 0], softmax = [σ(x), 1-σ(x)]. Plot σ(x).
+    fn: x => 1 / (1 + Math.exp(-x)),
+    deriv: x => { const s = 1/(1+Math.exp(-x)); return s*(1-s); },
+    color: 0xffb86b,
+    yRange: [-0.2, 1.3],
+    note: 'showing 2-class case (one output, the other is 1−this)',
+  },
+};
+
+// =============================================================================
+// Three.js scene
+// =============================================================================
+const canvasDiv = document.getElementById('canvas3d');
+const W = () => canvasDiv.clientWidth;
+const H = () => canvasDiv.clientHeight;
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x0b0d12);
+scene.fog = new THREE.Fog(0x0b0d12, 20, 50);
+
+const camera = new THREE.PerspectiveCamera(45, W() / H(), 0.1, 1000);
+camera.position.set(7, 5, 11);
+camera.lookAt(0, 1, 0);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setSize(W(), H());
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+canvasDiv.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.dampingFactor = 0.08;
+controls.minDistance = 4;
+controls.maxDistance = 30;
+
+// Lighting
+scene.add(new THREE.AmbientLight(0xffffff, 0.45));
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.7);
+dirLight.position.set(8, 12, 6);
+scene.add(dirLight);
+const dirLight2 = new THREE.DirectionalLight(0x7aa2ff, 0.3);
+dirLight2.position.set(-6, 4, -6);
+scene.add(dirLight2);
+
+// Grid floor
+const grid = new THREE.GridHelper(20, 20, 0x2a3142, 0x161a22);
+grid.position.y = -1.5;
+scene.add(grid);
+
+// Axes
+function makeAxis(from, to, color, label) {
+  const geo = new THREE.BufferGeometry().setFromPoints([from, to]);
+  const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0.6 });
+  return new THREE.Line(geo, mat);
+}
+const xAxis = makeAxis(new THREE.Vector3(-6, 0, 0), new THREE.Vector3(6, 0, 0), 0x9aa3b2);
+const yAxis = makeAxis(new THREE.Vector3(0, -1.5, 0), new THREE.Vector3(0, 4.5, 0), 0x9aa3b2);
+scene.add(xAxis); scene.add(yAxis);
+
+// Axis tick marks
+function addTick(x, label, axis = 'x') {
+  if (axis === 'x') {
+    const tick = makeAxis(new THREE.Vector3(x, -0.1, 0), new THREE.Vector3(x, 0.1, 0), 0x9aa3b2);
+    scene.add(tick);
+  } else {
+    const tick = makeAxis(new THREE.Vector3(-0.1, x, 0), new THREE.Vector3(0.1, x, 0), 0x9aa3b2);
+    scene.add(tick);
+  }
+}
+for (let x = -5; x <= 5; x++) if (x !== 0) addTick(x, String(x), 'x');
+for (let y of [1, 2, 3, 4, -1]) addTick(y, String(y), 'y');
+
+// Function curve container
+let curveGroup = new THREE.Group();
+scene.add(curveGroup);
+
+let currentKey = 'relu';
+let particleData = [];
+const NUM_PARTICLES = 40;
+
+function buildCurve(fnDef) {
+  // Clear previous
+  while (curveGroup.children.length) {
+    const c = curveGroup.children[0];
+    curveGroup.remove(c);
+    if (c.geometry) c.geometry.dispose();
+    if (c.material) c.material.dispose();
+  }
+
+  // Build main function as a tube
+  const points = [];
+  for (let x = -5.5; x <= 5.5; x += 0.05) {
+    let y = fnDef.fn(x);
+    // clip for visualization (e.g., ReLU at x=5 is y=5 — fine)
+    if (y > 5) y = 5;
+    if (y < -1.4) y = -1.4;
+    points.push(new THREE.Vector3(x, y, 0));
+  }
+  const curve = new THREE.CatmullRomCurve3(points, false, 'catmullrom', 0.0);
+  const tubeGeo = new THREE.TubeGeometry(curve, 250, 0.06, 12, false);
+  const tubeMat = new THREE.MeshStandardMaterial({
+    color: fnDef.color,
+    emissive: fnDef.color,
+    emissiveIntensity: 0.4,
+    metalness: 0.3,
+    roughness: 0.4,
+  });
+  const tube = new THREE.Mesh(tubeGeo, tubeMat);
+  curveGroup.add(tube);
+
+  // Build derivative as thinner translucent tube
+  if (showDeriv) {
+    const dPoints = [];
+    for (let x = -5.5; x <= 5.5; x += 0.05) {
+      let dy = fnDef.deriv(x);
+      if (dy > 5) dy = 5;
+      if (dy < -1.4) dy = -1.4;
+      dPoints.push(new THREE.Vector3(x, dy, -0.5));
+    }
+    const dCurve = new THREE.CatmullRomCurve3(dPoints, false, 'catmullrom', 0.0);
+    const dTubeGeo = new THREE.TubeGeometry(dCurve, 250, 0.03, 8, false);
+    const dTubeMat = new THREE.MeshStandardMaterial({
+      color: 0xff6b6b,
+      emissive: 0xff6b6b,
+      emissiveIntensity: 0.3,
+      transparent: true,
+      opacity: 0.7,
+    });
+    const dTube = new THREE.Mesh(dTubeGeo, dTubeMat);
+    curveGroup.add(dTube);
+  }
+}
+
+// =============================================================================
+// Particles — animated data flow
+// =============================================================================
+const particleGeo = new THREE.SphereGeometry(0.09, 16, 16);
+const particleMat = new THREE.MeshStandardMaterial({
+  color: 0xffb86b,
+  emissive: 0xffb86b,
+  emissiveIntensity: 0.5,
+});
+const particles = new THREE.InstancedMesh(particleGeo, particleMat, NUM_PARTICLES);
+scene.add(particles);
+
+function initParticles() {
+  particleData = [];
+  for (let i = 0; i < NUM_PARTICLES; i++) {
+    particleData.push({
+      x: -5.5 + (Math.random() * 11),
+      speed: 0.018 + Math.random() * 0.022,
+    });
+  }
+}
+initParticles();
+
+// =============================================================================
+// State / controls
+// =============================================================================
+let showDeriv = true;
+let showParticles = true;
+let autoRotate = false;
+
+function setActivation(key) {
+  currentKey = key;
+  const fnDef = ACTIVATIONS[key];
+  document.getElementById('fn-name').textContent = fnDef.name;
+  document.getElementById('fn-formula').textContent = fnDef.formula;
+  buildCurve(fnDef);
+  // Reset particles
+  initParticles();
+  // Update active button
+  document.querySelectorAll('#fn-buttons button').forEach(b => {
+    b.classList.toggle('active', b.dataset.fn === key);
+  });
+}
+
+document.querySelectorAll('#fn-buttons button').forEach(btn => {
+  btn.addEventListener('click', () => setActivation(btn.dataset.fn));
+});
+document.getElementById('show-deriv').addEventListener('change', e => {
+  showDeriv = e.target.checked;
+  buildCurve(ACTIVATIONS[currentKey]);
+});
+document.getElementById('show-particles').addEventListener('change', e => {
+  showParticles = e.target.checked;
+  particles.visible = showParticles;
+});
+document.getElementById('auto-rotate').addEventListener('change', e => {
+  autoRotate = e.target.checked;
+  controls.autoRotate = autoRotate;
+  controls.autoRotateSpeed = 0.5;
+});
+
+window.addEventListener('resize', () => {
+  camera.aspect = W() / H();
+  camera.updateProjectionMatrix();
+  renderer.setSize(W(), H());
+});
+
+// =============================================================================
+// Render loop
+// =============================================================================
+const matrix = new THREE.Matrix4();
+const color = new THREE.Color();
+
+function animate() {
+  requestAnimationFrame(animate);
+  controls.update();
+
+  // Update particles
+  if (showParticles) {
+    const fnDef = ACTIVATIONS[currentKey];
+    for (let i = 0; i < NUM_PARTICLES; i++) {
+      const p = particleData[i];
+      p.x += p.speed;
+      if (p.x > 5.5) p.x = -5.5;
+      let y = fnDef.fn(p.x);
+      if (y > 5) y = 5;
+      if (y < -1.4) y = -1.4;
+      matrix.setPosition(p.x, y, 0);
+      particles.setMatrixAt(i, matrix);
+    }
+    particles.instanceMatrix.needsUpdate = true;
+  }
+
+  renderer.render(scene, camera);
+}
+
+// Boot
+setActivation('relu');
+animate();
+
+// =============================================================================
+// Softmax interactive bars
+// =============================================================================
+function updateSoftmax() {
+  const x1 = parseFloat(document.getElementById('sm-x1').value);
+  const x2 = parseFloat(document.getElementById('sm-x2').value);
+  const x3 = parseFloat(document.getElementById('sm-x3').value);
+  document.getElementById('sm-v1').textContent = x1.toFixed(1);
+  document.getElementById('sm-v2').textContent = x2.toFixed(1);
+  document.getElementById('sm-v3').textContent = x3.toFixed(1);
+
+  // Numerically stable softmax
+  const m = Math.max(x1, x2, x3);
+  const e1 = Math.exp(x1 - m);
+  const e2 = Math.exp(x2 - m);
+  const e3 = Math.exp(x3 - m);
+  const s = e1 + e2 + e3;
+  const p1 = e1 / s, p2 = e2 / s, p3 = e3 / s;
+
+  document.getElementById('sm-p1').textContent = p1.toFixed(3);
+  document.getElementById('sm-p2').textContent = p2.toFixed(3);
+  document.getElementById('sm-p3').textContent = p3.toFixed(3);
+
+  document.getElementById('sm-bar1').style.height = `${p1 * 100}%`;
+  document.getElementById('sm-bar2').style.height = `${p2 * 100}%`;
+  document.getElementById('sm-bar3').style.height = `${p3 * 100}%`;
+
+  document.getElementById('sm-sum').textContent = (p1 + p2 + p3).toFixed(3);
+}
+
+['sm-x1', 'sm-x2', 'sm-x3'].forEach(id => {
+  document.getElementById(id).addEventListener('input', updateSoftmax);
+});
+updateSoftmax();
+</script>
+</body>
+</html>

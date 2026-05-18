@@ -579,6 +579,7 @@ assert torch.isclose(x.grad, torch.tensor([12.0]))</code></pre></div>
           <li><strong>Universal approximation</strong>: an MLP with enough hidden units can approximate any continuous function on a compact set. (In practice "enough" is huge — depth helps efficiency.)</li>
           <li><strong>Initialization matters</strong>: bad init → vanishing/exploding signals or grads. Standard schemes: Kaiming for ReLU-likes, Xavier/Glorot for tanh, scaled-init for transformers.</li>
         </ul>
+        <p><a href="activation-functions.html"><strong>→ 3D interactive tour of activation functions</strong></a> — every common nonlinearity (step, sigmoid, tanh, ReLU, Leaky ReLU, GELU, SiLU, Softmax) explained in 5 tiers from layman to mathematical, with a rotatable 3D plot of each.</p>
         <div class="notebook">
           <div class="nb-title">Try it in Colab</div>
           <div class="cell"><span class="cn bash">!sh</span><pre><code>!pip install -q torch</code></pre></div>
